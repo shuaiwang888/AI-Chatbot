@@ -5,7 +5,7 @@ import logging
 
 from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 
-from app.core.errors import DocumentNotFoundError
+from app.core.errors import AppError, DocumentNotFoundError
 from app.models import db
 from app.models.schemas import DocumentChunk, IngestResult
 from app.services.ingestion import (
@@ -84,9 +84,14 @@ async def upload(file: UploadFile = File(...)) -> IngestResult:
 
     try:
         result = await ingest_bytes(content=content, filename=file.filename)
+    except AppError:
+        # 业务异常 (e.g. IngestionFailedError) 直接抛, 走全局 AppError handler
+        # 保留 .code / .message / .detail (含 last_traceback 等诊断信息)
+        logger.exception("Upload failed (AppError)")
+        raise
     except Exception as e:  # noqa: BLE001
-        # 已记录到 SQLite; 返回 502
-        logger.exception("Upload failed")
+        # 兜底: 未知异常, 包成 HTTP 502
+        logger.exception("Upload failed (unexpected)")
         raise HTTPException(status_code=502, detail=f"Ingest failed: {e}") from e
 
     return result
