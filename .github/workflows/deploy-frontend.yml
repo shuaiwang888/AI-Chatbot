@@ -41,8 +41,9 @@ jobs:
         env:
           # 必填: 后端 API 完整 URL (末尾不带 /). 例: https://yourname-ai-chatbot.hf.space/api/v1
           VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
-          # GitHub 仓库名 (用于 base path). 形如 "ai-chatbot" (用户名+仓库模式) 或 "yourname/ai-chatbot"
-          VITE_REPO_NAME: ${{ vars.VITE_REPO_NAME || 'ai-chatbot' }}
+          # GITHUB_REPOSITORY 是 GH Actions 自动注入的环境变量 (形如 "owner/Repo-Name"),
+          # vite.config.ts 会从中提取仓库名作为 base path, 大小写自动与 GitHub 仓库匹配.
+          # 手动 override: 在 repo Variables 里设 VITE_REPO_NAME (优先级更高).
         run: npm run build
 
       - name: Setup Pages
