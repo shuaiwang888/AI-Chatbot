@@ -17,11 +17,12 @@ httpx>=0.27                       # AsyncOpenAI 依赖
 langgraph>=0.3,<1.0
 langchain-core>=0.3,<1.0
 langgraph-checkpoint-sqlite>=2.0  # 实施前核对最新稳定版
-pydantic-ai>=0.2,<1.0
+# pydantic-ai 注释掉: 与 marker-pdf 冲突, 我们代码里不用 (会引一堆 LLM 依赖)
 
 # ========== 文档解析 ==========
 docling>=2.30,<2.74               # 主力：结构感知 + 跨页表 + OCR
-marker-pdf>=1.10                  # 兜底：文字密集型 PDF / Docling 失败时启用 (无上界, 避免 dependency conflict)
+pypdf>=4.0                        # 兜底：纯 Python PDF 文本提取 (零冲突, 50 行 fallback parser)
+# marker-pdf 注释掉: 与 pydantic-ai 冲突 (anthropic 版本要求)
 # mineru>=0.22                    # 可选：学术论文 / 复杂双栏 (按需安装)
 
 # ========== Embedding / Reranker ==========

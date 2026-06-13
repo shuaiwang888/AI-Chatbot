@@ -31,10 +31,10 @@ def _register_default() -> None:
     except ImportError as e:
         logger.warning("docling not installed: %s", e)
     try:
-        from app.services.parsers.marker_parser import MarkerParser
-        _REGISTRY["marker"] = MarkerParser
+        from app.services.parsers.simple_parser import SimpleParser
+        _REGISTRY["simple"] = SimpleParser
     except ImportError as e:
-        logger.warning("marker-pdf not installed: %s", e)
+        logger.warning("simple parser not installed: %s", e)
     # mineru / vlm 留 hook (按需装)
 
 
