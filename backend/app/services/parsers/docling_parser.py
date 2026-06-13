@@ -53,7 +53,9 @@ class DoclingParser(BaseParser):
         opts.do_ocr = settings.parser_enable_ocr
         opts.do_table_structure = settings.parser_table_structure
         opts.images_scale = 2.0
-        opts.artifacts_path = str(settings.data_dir / "docling_models")
+        # ⚠️ 不要设 artifacts_path: 设了但目录为空会被 Docling 拒绝 (报 "is not valid")
+        # 不设时, Docling 通过 huggingface_hub 走 HF_HOME 自动下载 + 缓存
+        # 我们的 Dockerfile 设了 HF_HOME=/data/.cache/huggingface (持久卷), 所以重启后还在
         opts.accelerator_options = AcceleratorOptions(device=AcceleratorDevice.CPU)
 
         converter = DocumentConverter(
