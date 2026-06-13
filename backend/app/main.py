@@ -75,8 +75,19 @@ async def lifespan(app: FastAPI):
         # 仅检查 import 路径, 不实际编译
         from app.agents.graph import _build_graph  # noqa: F401
         logger.info("LangGraph importable")
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:  # noqa: BLE401
         logger.warning("LangGraph import failed: %s", e)
+
+    # Docling 模型预下载 (首次启动时从 HF 拉 layout/table/ocr 模型, 约 2GB).
+    # 不阻塞启动, 失败仅记 warning. 这样首次上传时不会卡在模型下载上.
+    import os
+    if not os.environ.get("TESTING") and settings.parser_primary == "docling":
+        try:
+            import asyncio
+            from app.services.parsers.docling_parser import _prewarm_docling_models
+            await asyncio.to_thread(_prewarm_docling_models)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("Docling model prewarm failed (will retry on first upload): %s", e)
 
     logger.info("Backend ready")
     yield

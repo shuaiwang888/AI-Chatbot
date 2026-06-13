@@ -86,17 +86,30 @@ async def parse_with_fallback(file_path: Path) -> ParsedDocument:
         )
 
     last_err: Exception | None = None
+    last_traceback: str | None = None
     for parser in candidates:
         try:
             return await parser.parse(file_path)
         except Exception as e:  # noqa: BLE001
-            logger.warning("Parser %s failed for %s: %s", parser.name, file_path.name, e)
+            import traceback
+            tb = traceback.format_exc()
+            logger.warning("Parser %s failed for %s: %s\n%s", parser.name, file_path.name, e, tb)
             last_err = e
+            last_traceback = tb
 
+    # 把最后一个 parser 的具体异常信息暴露给前端, 方便诊断
+    err_msg = f"All parsers failed for {file_path.name}"
+    if last_err:
+        err_msg += f" (last: {type(last_err).__name__}: {last_err})"
     raise IngestionFailedError(
-        f"All parsers failed for {file_path.name}",
+        err_msg,
         code="all_parsers_failed",
-        detail={"chain": [p.name for p in candidates]},
+        detail={
+            "chain": [p.name for p in candidates],
+            "last_error_type": type(last_err).__name__ if last_err else None,
+            "last_error_msg": str(last_err)[:500] if last_err else None,
+            "last_traceback": (last_traceback or "")[-1500:],  # 末 1.5KB, 防爆
+        },
     ) from last_err
 
 

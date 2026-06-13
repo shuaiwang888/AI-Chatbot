@@ -21,7 +21,7 @@ pydantic-ai>=0.2,<1.0
 
 # ========== 文档解析 ==========
 docling>=2.30,<2.74               # 主力：结构感知 + 跨页表 + OCR
-# marker-pdf>=1.10                  # 兜底：文字密集型 PDF (Intel Mac 暂不支持)
+marker-pdf>=1.10,<2.0             # 兜底：文字密集型 PDF / Docling 失败时启用
 # mineru>=0.22                    # 可选：学术论文 / 复杂双栏 (按需安装)
 
 # ========== Embedding / Reranker ==========

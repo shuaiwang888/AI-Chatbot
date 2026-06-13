@@ -119,3 +119,59 @@ class DoclingParser(BaseParser):
                 "elapsed_ms": elapsed_ms,
             },
         )
+
+
+def _prewarm_docling_models() -> None:
+    """预下载 Docling 需要的模型 (layout/heron, tableformer, paddleocr 等, 共 ~2GB).
+
+    在 Space 启动 lifespan 阶段跑一次, 避免首次上传时下载超时或下载失败.
+    模型会缓存到 settings.hf_cache_dir, 后续启动跳过.
+    """
+    import logging
+    from pathlib import Path
+    from app.config import settings
+
+    logger_local = logging.getLogger(__name__)
+    logger_local.info("Docling model prewarm: pulling layout/table/ocr models...")
+
+    from huggingface_hub import snapshot_download
+
+    # Docling 模型都在 ds4sd 命名空间下
+    repos = [
+        "ds4sd/docling-models",  # 主模型集 (layout, tableformer)
+    ]
+
+    cache_dir = Path(settings.hf_cache_dir) if hasattr(settings, "hf_cache_dir") else None
+    if cache_dir is None:
+        from app.core.paths import data_dir
+        cache_dir = data_dir() / ".cache" / "huggingface"
+
+    for repo in repos:
+        try:
+            p = snapshot_download(
+                repo_id=repo,
+                cache_dir=str(cache_dir),
+                # 避免下载所有 variants, 只下必需的
+                allow_patterns=[
+                    "*.json",
+                    "*.txt",
+                    "*.safetensors",
+                    "tokenizer*",
+                ],
+            )
+            logger_local.info("Docling model %s cached at %s", repo, p)
+        except Exception as e:  # noqa: BLE001
+            logger_local.warning("Docling model prewarm %s failed: %s", repo, e)
+
+    # PaddleOCR 模型 (Docling 内置 OCR 用). 单独下载.
+    try:
+        from paddleocr import PaddleOCR  # type: ignore
+        # 实例化会触发模型下载到 ~/.paddleocr
+        PaddleOCR(use_angle_cls=False, lang="ch", show_log=False)
+        logger_local.info("PaddleOCR (ch) model cached")
+    except Exception as e:  # noqa: BLE001
+        # PaddleOCR 可能没装 (e.g. arm64 平台), 不阻塞
+        logger_local.warning("PaddleOCR prewarm skipped: %s", e)
+
+    logger_local.info("Docling model prewarm done")
+
