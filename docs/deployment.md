@@ -478,6 +478,53 @@ self.client = AsyncOpenAI(
 
 ---
 
+### 坑 9: GH Pages base path 大小写不匹配 → 空白页面
+
+**症状**:
+- 部署到 GH Pages 后页面**完全空白**
+- HTML 正常返回 200, 但 bundle 404
+- 浏览器 DevTools → Network: `index-XXX.js` 报 404
+
+**原因**: GH Pages 对路径**大小写敏感** (虽然 Server 端有 fallback, 但 asset 路径不会). 如果 Vite 用了小写 `ai-chatbot` 作为 base, 但 GitHub 仓库是 `AI-Chatbot`, bundle 找不到.
+
+**验证**:
+```bash
+# 仓库是大写
+curl -I https://USER.github.io/AI-Chatbot/                     # 200 ✓
+curl -I https://USER.github.io/AI-Chatbot/assets/index-X.js     # 200 ✓
+
+# Vite 默认用了小写 (会 404)
+curl -I https://USER.github.io/ai-chatbot/                      # 404
+curl -I https://USER.github.io/ai-chatbot/assets/index-X.js      # 404
+```
+
+**修法** (已修, `frontend/vite.config.ts`):
+```typescript
+function resolveRepoName(): string {
+  // 1. 显式 VITE_REPO_NAME (最高优先级, 手动 override)
+  const explicit = process.env.VITE_REPO_NAME;
+  if (explicit) return explicit;
+
+  // 2. GH Actions 自动注入, 形如 "owner/Repo-Name", 提取大小写正确的仓库名
+  const ghRepo = process.env.GITHUB_REPOSITORY;
+  if (ghRepo) {
+    const parts = ghRepo.split('/');
+    if (parts.length === 2 && parts[1]) return parts[1];
+  }
+
+  // 3. 兜底 (本地 dev)
+  return 'ai-chatbot';
+}
+
+const REPO_NAME = resolveRepoName();
+// ...
+base: mode === 'production' ? `/${REPO_NAME}/` : '/',
+```
+
+**关键**: GH Actions 里**不要**硬编码 `VITE_REPO_NAME: ${{ vars.VITE_REPO_NAME || 'ai-chatbot' }}`, 让 `GITHUB_REPOSITORY` 自动接管. 如果用户仓库名带大小写 (如 `AI-Chatbot`), 手动设的小写默认值会把构建搞坏.
+
+---
+
 ## 7. 升级到付费版 (按需)
 
 | 项 | 免费 (当前) | 付费选项 | 升级理由 |
