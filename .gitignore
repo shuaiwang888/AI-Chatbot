@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node
+node_modules/
+.pnpm-store/
+dist/
+.vite/
+*.log
+
+# Env & secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Data (persistent disk in HF Space, local dev too)
+backend/data/
+backend/.cache/
+backend/models/
+data/
+*.parquet
+*.arrow
+*.bin
+*.safetensors
+*.gguf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.egg
+build/
+dist/
+.coverage
+htmlcov/

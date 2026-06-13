@@ -1,0 +1,84 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+# 允许并发部署, 但同 branch 排队
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 仅 main branch 部署到生产环境
+environment:
+  name: github-pages
+  url: ${{ steps.deployment.outputs.page_url }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Setup pnpm
+        if: hashFiles('frontend/pnpm-lock.yaml') != ''
+        run: npm install -g pnpm@9
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm install --frozen-lockfile
+          else
+            npm ci
+          fi
+
+      - name: Build
+        working-directory: frontend
+        env:
+          # 必填: 后端 API 完整 URL (末尾不带 /). 例: https://yourname-ai-chatbot.hf.space/api/v1
+          VITE_API_BASE: ${{ secrets.VITE_API_BASE }}
+          # GitHub 仓库名 (用于 base path). 形如 "ai-chatbot" (用户名+仓库模式) 或 "yourname/ai-chatbot"
+          VITE_REPO_NAME: ${{ vars.VITE_REPO_NAME || 'ai-chatbot' }}
+        run: |
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm run build
+          else
+            npm run build
+          fi
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

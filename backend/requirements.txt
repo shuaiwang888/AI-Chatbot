@@ -1,0 +1,54 @@
+# ========== Web 框架 ==========
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.32,<1.0
+python-multipart>=0.0.12          # 文件上传
+sse-starlette>=2.1.3              # SSE 增强
+
+# ========== 配置 ==========
+pydantic>=2.9,<3.0
+pydantic-settings>=2.5,<3.0
+python-dotenv>=1.0
+
+# ========== LLM 抽象 (OpenAI 兼容) ==========
+openai>=1.60,<2.0                 # MiniMax-M3 / OpenAI / 兼容 provider 共用
+httpx>=0.27                       # AsyncOpenAI 依赖
+
+# ========== Agent / LangGraph ==========
+langgraph>=0.3,<1.0
+langchain-core>=0.3,<1.0
+langgraph-checkpoint-sqlite>=2.0  # 实施前核对最新稳定版
+pydantic-ai>=0.2,<1.0
+
+# ========== 文档解析 ==========
+docling>=2.30,<2.74               # 主力：结构感知 + 跨页表 + OCR
+# marker-pdf>=1.10                  # 兜底：文字密集型 PDF (Intel Mac 暂不支持)
+# mineru>=0.22                    # 可选：学术论文 / 复杂双栏 (按需安装)
+
+# ========== Embedding / Reranker ==========
+FlagEmbedding>=1.2                # BGE-M3 + bge-reranker-v2-m3
+sentence-transformers>=3.0        # 备选 embedding 库
+torch>=2.2                        # FlagEmbedding 依赖
+
+# ========== 向量库 ==========
+chromadb>=0.5,<2.0                # 1.0+ Rust core
+rank-bm25>=0.2.2                  # BM25 备用 (当前用 BGE-M3 稀疏通路, 留作降级)
+
+# ========== 持久化 ==========
+huggingface_hub>=0.30             # snapshot_download / upload_folder
+
+# ========== 分块 / NLP ==========
+tiktoken>=0.7                     # token 计数
+nltk>=3.9                         # 句子切分
+tenacity>=9.0                     # 重试
+cachetools                        # LLM 缓存
+
+# ========== 评估 / 可观测性 ==========
+# ragas>=0.2                        # RAG 质量离线评估
+# deepeval>=1.0                     # 质量门禁
+
+# ========== 测试 ==========
+pytest>=8.0
+pytest-asyncio>=0.23
+pytest-cov>=5.0
+httpx>=0.27                       # TestClient
+respx>=0.21                       # mock httpx
