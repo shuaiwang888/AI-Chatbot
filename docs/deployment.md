@@ -525,6 +525,43 @@ base: mode === 'production' ? `/${REPO_NAME}/` : '/',
 
 ---
 
+### 坑 10: VITE_API_BASE 路径双写 → 后端永远显示"离线"
+
+**症状**:
+- 后端 `/api/v1/healthz` / `/api/v1/readyz` 都 200
+- 但前端 TopBar 永远显示"后端离线" 红色 badge
+- 浏览器 DevTools → Network: 所有 API 请求都返回 **404 Not Found**, URL 形如 `/api/v1/api/v1/readyz` (双前缀)
+
+**根因**: `apiBase` (来自 `VITE_API_BASE`) 已经包含 `/api/v1` 结尾, 但 `api.ts` 和 `sse.ts` 内部又拼一次 `/api/v1/...`, 导致最终 URL 多了一段:
+
+```typescript
+// _request() in api.ts
+const url = `${apiBase}${path}`;
+// apiBase = "https://appQQQ-ai-chatbot.hf.space/api/v1"
+// path    = "/api/v1/readyz"
+// → url   = "https://appQQQ-ai-chatbot.hf.space/api/v1/api/v1/readyz"  ❌
+```
+
+**修法** (已修, `frontend/src/env.ts`): 在环境变量解析时**规范化** `apiBase`, 去掉尾部 `/api/v1`:
+
+```typescript
+const _rawApiBase = (import.meta.env.VITE_API_BASE || '').trim().replace(/\/$/, '');
+const _apiBase = _rawApiBase.replace(/\/api\/v1$/, '');
+// 现在 apiBase 可写成以下任一种, 结果都一样:
+//   "https://appQQQ-ai-chatbot.hf.space"           → base = "https://appQQQ-ai-chatbot.hf.space"
+//   "https://appQQQ-ai-chatbot.hf.space/api/v1"    → base = "https://appQQQ-ai-chatbot.hf.space"
+//   "https://appQQQ-ai-chatbot.hf.space/api/v1/"   → base = "https://appQQQ-ai-chatbot.hf.space"
+```
+
+**诊断**:
+```bash
+# 在前端 bundle 里搜, 不应该出现
+grep -oE "https://[^/]+/api/v1/api/v1[^\"']*" dist/assets/index-*.js
+# 应该返回空
+```
+
+---
+
 ## 7. 升级到付费版 (按需)
 
 | 项 | 免费 (当前) | 付费选项 | 升级理由 |
