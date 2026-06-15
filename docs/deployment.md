@@ -8,6 +8,9 @@
 > - 代码仓库: https://github.com/shuaiwang888/AI-Chatbot
 > - HF Space: https://huggingface.co/spaces/appQQQ/ai-chatbot
 
+> ⚠️ **本项目不支持本机本地启动**. 所有 dev script (npm run dev / vite preview / uvicorn reload) 已删除,
+> CORS 默认值改为空列表 (不显式配 `ALLOWED_ORIGINS` 直接启动会被拒), 防止误以为可以本地起.
+
 ---
 
 ## 0. 架构总览
@@ -388,7 +391,7 @@ Setup Node: Unable to locate executable file: pnpm
 **症状**: 浏览器 Network 里 `(blocked: cors)` 或 `405 Method Not Allowed`.
 
 **原因**:
-1. 没设 `ALLOWED_ORIGINS` → 后端用默认 `["http://localhost:5173", "http://localhost:3000"]`
+1. 没设 `ALLOWED_ORIGINS` → 后端默认是空列表 `[]`, **所有跨域请求全被拒**
 2. 大小写不匹配 / 带斜杠 / 协议不对
 
 **正确格式** (Pydantic 解析 JSON 数组):

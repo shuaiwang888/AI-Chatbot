@@ -36,6 +36,13 @@ data/
 *.safetensors
 *.gguf
 
+# ⚠️ 本项目不提供本机本地启动, 这些本地启动相关文件如出现应被忽略 (防止误入仓)
+# (npm run dev / vite preview / uvicorn reload 都已从代码中删除)
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+backend/__pycache__/  # 双保险, 上面已列出 __pycache__/
+
 # IDE
 .vscode/
 .idea/

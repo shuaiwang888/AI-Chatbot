@@ -2,58 +2,40 @@
 
 React 19 + Vite + TypeScript + shadcn/ui · 部署到 GitHub Pages.
 
-## 本地开发
-
-```bash
-# 1. 安装依赖
-pnpm install          # 或 npm install
-
-# 2. 复制环境变量
-cp .env.example .env
-# 编辑 .env, 设置 VITE_API_BASE (生产) / VITE_DEV_API_BASE (本地 dev)
-
-# 3. 启 dev server
-pnpm dev
-# → http://localhost:5173
-```
-
-Vite dev server 走 proxy, `/api/*` 自动转发到 `VITE_DEV_API_BASE` (默认 `http://localhost:7860`),
-所以本地不需要处理 CORS.
-
-## 构建
-
-```bash
-pnpm build
-# → frontend/dist/  (静态资源, 直接放到任何静态托管)
-```
+> ⚠️ **本项目无 dev server / 无本地启动**。`npm run dev` / `vite preview` 都已删除。
+> 所有前端代码改动通过 `git push main` → GH Actions 自动 build & deploy。
 
 ## 部署到 GitHub Pages
 
 ### 一次性配置
 1. GitHub repo → Settings → Pages → Source = **GitHub Actions**
 2. Settings → Secrets and variables → Actions:
-   - **Secret** `VITE_API_BASE` = `https://yourname-ai-chatbot.hf.space/api/v1`
-   - **Variable** `VITE_REPO_NAME` = `ai-chatbot` (你的仓库名, 用于 base path)
+   - **Secret** `VITE_API_BASE` = `https://<user>-<space>.hf.space/api/v1`
+   - **Variable** `VITE_REPO_NAME` = `<repo-name>` (用于 base path)
 3. 推 `main` 分支, GitHub Actions 自动 build + deploy
 
 ### 访问
-- 用户/组织页: `https://<username>.github.io/`
 - 项目页: `https://<username>.github.io/<repo-name>/`
+
+### 自动构建原理
+- `vite build` 直接产出 `dist/`
+- `base: /<repo-name>/` 已硬编码, 适配项目页路径
+- 跨域请求走 `VITE_API_BASE` 直连 HF Space, 免 CORS proxy
 
 ## 目录结构
 
 ```
 frontend/
-├── package.json              # 依赖
-├── vite.config.ts            # Vite + React + base path + dev proxy
+├── package.json              # 依赖 + 唯一脚本: build
+├── vite.config.ts            # Vite + React + GH Pages base path
 ├── tsconfig*.json            # TS strict 模式
 ├── index.html
-├── .env.example
+├── .env.example              # 仅参考, 实际值由 GH Actions 注入
 └── src/
     ├── main.tsx              # React 19 createRoot
     ├── App.tsx               # QueryClient + HashRouter
     ├── router.tsx            # 路由表 (/chat, /documents)
-    ├── env.ts                # import.meta.env 集中校验
+    ├── env.ts                # import.meta.env 集中校验 (VITE_API_BASE 必填)
     ├── types.ts              # 与后端 schemas 对齐
     ├── styles/globals.css    # Tailwind v4 + 主题变量
     ├── lib/

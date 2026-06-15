@@ -9,6 +9,20 @@
 ![langgraph](https://img.shields.io/badge/langgraph-0.3%2B-orange)
 ![deploy](https://img.shields.io/badge/deploy-HF%20Spaces%20%2B%20GH%20Pages-brightgreen)
 
+## ⚠️ 部署方式
+
+**本项目只支持线上部署，不提供本机本地启动。**
+
+| 角色 | 平台 | 地址 |
+|---|---|---|
+| 后端 | HuggingFace Spaces (Docker) | `https://<user>-<space>.hf.space` |
+| 前端 | GitHub Pages (静态) | `https://<user>.github.io/<repo>/` |
+| 持久化 | HuggingFace Dataset (Git LFS) | `https://huggingface.co/datasets/<user>/<data>` |
+
+部署步骤见 [docs/deployment.md](docs/deployment.md)。代码改动通过：
+- **前端** → `git push main` → GH Actions 自动 build & deploy
+- **后端** → `./scripts/deploy-backend-fix.sh` → 推到 HF Space 仓库
+
 ## ✨ 功能
 
 - 📄 **多格式文档摄入**: PDF / Word / PPT / Excel / 图片 (中英 OCR)
@@ -32,35 +46,39 @@ FastAPI + LangGraph + Docling  →  HuggingFace Spaces (Docker)
 
 详见 [docs/architecture.md](docs/architecture.md)
 
-## 🚀 快速开始
+## 📁 项目结构
 
-### 本地开发
-
-```bash
-# 1. 克隆
-git clone https://github.com/yourname/ai-chatbot
-cd ai-chatbot
-
-# 2. 后端
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-# 编辑 .env, 填入 MINIMAX_API_KEY
-uvicorn app.main:app --reload --port 7860
-# → http://localhost:7860/api/docs
-
-# 3. 前端 (新终端)
-cd frontend
-pnpm install    # 或 npm install
-cp .env.example .env
-pnpm dev
-# → http://localhost:5173
 ```
-
-### 部署
-
-详见 [docs/deployment.md](docs/deployment.md)
+ai-chatbot/
+├── PLAN.md                       # 完整方案 (557 行, 4 处高优修复)
+├── README.md                     # ← 你在这里
+├── docs/
+│   ├── architecture.md
+│   └── deployment.md             # 部署指南 (HF Space + GH Pages)
+│
+├── backend/                      # FastAPI + LangGraph (线上后端)
+│   ├── Dockerfile                # HF Space 构建
+│   ├── README.md                 # HF Space 元数据
+│   ├── requirements.txt
+│   ├── pyproject.toml
+│   ├── app/                      # 源码 (同步推 HF Space)
+│   └── tests/unit/               # 3 个 smoke 脚本 (线上跑)
+│
+├── frontend/                     # React 19 + Vite (线上前端)
+│   ├── package.json
+│   ├── vite.config.ts            # GH Pages base path
+│   ├── tsconfig.json
+│   ├── README.md
+│   └── src/                      # 源码 (GH Actions 自动 build)
+│
+├── scripts/                      # 部署脚本
+│   ├── deploy-to-hf-space.sh     # 完整后端打包 + 推送
+│   ├── deploy-backend-fix.sh     # 增量修复 (tarball + strip-components)
+│   └── deploy-via-api.py         # hf-mirror 不可用时的 API 直推
+│
+└── .github/workflows/
+    └── deploy-frontend.yml       # GH Pages 自动部署
+```
 
 ## 📁 项目结构
 
@@ -116,13 +134,14 @@ ai-chatbot/
     └── test-backend.yml          # 后端 lint + smoke
 ```
 
-## 🧪 测试
+## 🧪 测试 (在线上 HF Space 跑)
+
+HF Space 网页 → **Shell** 标签页内:
 
 ```bash
-cd backend
-python tests/unit/smoke_phase1.py   # 基础 LLM + API
-python tests/unit/smoke_phase2.py   # 文档摄入
-python tests/unit/smoke_phase3.py   # Agent 端到端
+cd /app && python tests/unit/smoke_phase1.py   # 基础 LLM + API
+cd /app && python tests/unit/smoke_phase2.py   # 文档摄入
+cd /app && python tests/unit/smoke_phase3.py   # Agent 端到端
 ```
 
 ## 🛠️ 技术栈

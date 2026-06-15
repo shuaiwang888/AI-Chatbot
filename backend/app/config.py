@@ -115,11 +115,11 @@ class Settings(BaseSettings):
     langchain_project: str = "ai-chatbot"
 
     # ========== CORS ==========
+    # ⚠️ 在线部署专属: 此项目不再支持本机本地启动.
+    # 必须通过环境变量 ALLOWED_ORIGINS 显式配置线上前端域名 (GH Pages 形如
+    # "https://<user>.github.io"), 否则启动时该字段为空列表, 所有跨域请求都会被拒.
     allowed_origins: list[str] = Field(
-        default_factory=lambda: [
-            "http://localhost:5173",
-            "http://localhost:3000",
-        ]
+        default_factory=lambda: []
     )
 
     @field_validator("allowed_origins", mode="before")
