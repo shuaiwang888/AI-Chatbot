@@ -15,6 +15,7 @@ import type {
   Citation,
   ProgressEvent,
   RetrievalEvent,
+  SessionMessage,
   StreamEventPayload,
   ThinkingEvent,
   ToolCallEvent,
@@ -50,6 +51,7 @@ interface ChatState {
 
   // actions
   setSessionId: (id: string) => void;
+  loadSessionMessages: (msgs: SessionMessage[]) => void;
   appendUser: (content: string) => string;       // 返回 message id
   startAssistant: () => string;                   // 返回 message id
   appendToken: (content: string) => void;
@@ -76,7 +78,19 @@ export const useChatStore = create<ChatState>()(
     showAgentTrace: false,
     showCitations: true,
 
-    setSessionId: (id) => set({ sessionId: id, messages: [], error: null }),
+    setSessionId: (id) => set({ sessionId: id }),
+    // 不再 wipe messages; 由调用方显式调用 reset() / loadSessionMessages()
+
+    /** 从后端 SessionDetail.messages 加载历史到当前 store. 替换现有 messages. */
+    loadSessionMessages: (msgs) => {
+      const messages: ChatMessage[] = (msgs ?? []).map((m) => ({
+        id: m.id,
+        role: m.role as ChatMessage['role'],
+        content: m.content,
+        createdAt: typeof m.created_at === 'number' ? m.created_at * 1000 : Date.now(),
+      }));
+      set({ messages, error: null, isStreaming: false, currentAssistantId: null });
+    },
 
     appendUser: (content) => {
       const id = crypto.randomUUID();

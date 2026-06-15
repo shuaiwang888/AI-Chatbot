@@ -14,6 +14,11 @@ export function useChatStream() {
 
   const send = useCallback(async (params: { sessionId: string; message: string; docIds?: string[] | null }) => {
     const store = useChatStore.getState();
+    // 如果 sessionId 变化了, 先清空 (新会话不显示旧消息).
+    // 同一 session 内继续发, 保留历史.
+    if (store.sessionId !== params.sessionId) {
+      store.reset();
+    }
     store.setSessionId(params.sessionId);
     store.appendUser(params.message);
     store.startAssistant();

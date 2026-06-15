@@ -79,6 +79,16 @@ class SessionMeta(BaseModel):
     updated_at: float
 
 
+class SessionCreate(BaseModel):
+    """POST /sessions body."""
+    title: str | None = None
+
+
+class SessionUpdate(BaseModel):
+    """PATCH /sessions/{id} body. 字段都可空 (只更新非空字段)."""
+    title: str | None = None
+
+
 # ========== Health ==========
 class HealthStatus(BaseModel):
     status: Literal["ok", "degraded"]

@@ -2,6 +2,7 @@ import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TopBar } from '@/components/layout/TopBar';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { SessionHistoryPanel } from '@/components/sessions/SessionHistoryPanel';
 import { AppRouter } from '@/router';
 
 const queryClient = new QueryClient({
@@ -25,6 +26,7 @@ export function App() {
             <main className="flex-1 overflow-hidden">
               <AppRouter />
             </main>
+            <SessionHistoryPanel />
           </div>
         </div>
       </HashRouter>

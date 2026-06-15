@@ -88,9 +88,9 @@ export function DocumentDetailDialog({ docId, open, onOpenChange }: DocumentDeta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl overflow-hidden">
         <DialogHeader>
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
             <DialogTitle className="truncate" title={meta?.filename}>
               {meta ? truncateFilename(meta.filename, 60) : '加载中…'}
@@ -279,7 +279,7 @@ function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
           </span>
         )}
       </div>
-      <p className="whitespace-pre-wrap text-foreground/90 leading-relaxed">{chunk.text}</p>
+      <p className="whitespace-pre-wrap break-words text-foreground/90 leading-relaxed">{chunk.text}</p>
     </div>
   );
 }

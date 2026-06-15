@@ -168,7 +168,13 @@ async def _run_agent(
     state["messages"] = history_msgs
 
     # 4. 记录 user message 到 SQLite
-    db.session_upsert(req.session_id)
+    #    - 若 session 还没有 title 且这是首条 user 消息, 自动从前 30 字生成
+    existing = db.session_get(req.session_id)
+    auto_title = None
+    if existing is None or not existing.get("title"):
+        from app.api.sessions import _auto_title
+        auto_title = _auto_title(req.message)
+    db.session_upsert(req.session_id, title=auto_title)
     db.message_insert({
         "id": uuid.uuid4().hex,
         "session_id": req.session_id,

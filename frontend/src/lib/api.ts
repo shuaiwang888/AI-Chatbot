@@ -116,12 +116,20 @@ export const documentsApi = {
 
 // ========== Sessions ==========
 export const sessionsApi = {
-  list: () => _request<{ sessions: SessionMeta[]; total: number }>('/api/v1/sessions'),
+  list: (params?: { limit?: number }) => {
+    const q = params?.limit ? `?limit=${params.limit}` : '';
+    return _request<{ sessions: SessionMeta[]; total: number }>(`/api/v1/sessions${q}`);
+  },
   get: (sessionId: string) => _request<SessionDetail>(`/api/v1/sessions/${sessionId}`),
   create: (title?: string) =>
     _request<{ session_id: string; title: string | null }>('/api/v1/sessions', {
       method: 'POST',
       body: JSON.stringify({ title }),
+    }),
+  update: (sessionId: string, body: { title?: string }) =>
+    _request<{ session: SessionMeta }>(`/api/v1/sessions/${sessionId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
     }),
   delete: (sessionId: string) =>
     _request<{ session_id: string; deleted: boolean }>(`/api/v1/sessions/${sessionId}`, {

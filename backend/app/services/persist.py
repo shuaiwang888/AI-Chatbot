@@ -12,10 +12,14 @@
 - 首次部署 (repo 不存在) → 捕获 RepositoryNotFoundError → 标记 "fresh_start"
 - HF_TOKEN 缺失 → 跳过持久化, 降级为纯本地
 - 网络错误 → 重试 3 次后放弃, 不阻塞业务
+- upload_folder 跑在**独立 executor** 上, 不会占业务池 (否则 HF Space → HF Dataset
+  一旦卡/慢, ChromaDB query / BGE-M3 encode 等业务的 run_in_executor 全排不上, chat 直接挂)
+- push 失败时**也重置** pending_push flag, 不然 schedule_push 永远 short-circuit
 """
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import logging
 import shutil
 from pathlib import Path
@@ -32,6 +36,18 @@ from app.config import settings
 from app.core.paths import data_dir, sqlite_dir, chroma_dir, upload_dir
 
 logger = logging.getLogger(__name__)
+
+
+# ✅ 独立 ThreadPoolExecutor, 不跟业务 (Chroma / BGE-M3 / run_in_executor) 抢线程
+# 2 个 worker 够用: push 是单飞, 第二个留给 restore (启动期偶发重入)
+_persist_executor = concurrent.futures.ThreadPoolExecutor(
+    max_workers=2,
+    thread_name_prefix="persist",
+)
+
+# ✅ 持有后台 task 引用, 避免 asyncio GC 回收未完成的 30s debounce 任务
+# (曾因为 _state["pending_push"] = True 但 _delayed_push 被 GC, 导致永远卡死)
+_background_tasks: set[asyncio.Task] = set()
 
 # 状态机: 持久化是否启用 / 启动模式
 _state: dict[str, str | bool] = {
@@ -63,7 +79,7 @@ async def restore_from_hf() -> None:
     loop = asyncio.get_running_loop()
     try:
         await loop.run_in_executor(
-            None,
+            _persist_executor,  # ✅ 独立池
             lambda: snapshot_download(
                 repo_id=repo_id,
                 repo_type="dataset",
@@ -83,7 +99,7 @@ async def restore_from_hf() -> None:
             repo_id,
         )
     except Exception as e:  # noqa: BLE001
-        logger.error("Persist restore failed (will start fresh): %s", e)
+        logger.error("Persist restore failed (will start fresh): %s", e, exc_info=True)
         _state["mode"] = "fresh_start"
         # 不阻塞启动, 提示用户在 /readyz 看到降级状态
 
@@ -103,7 +119,7 @@ async def push_to_hf() -> None:
     loop = asyncio.get_running_loop()
     try:
         await loop.run_in_executor(
-            None,
+            _persist_executor,  # ✅ 独立池, 不阻塞业务 (Chroma / BGE-M3) 的 run_in_executor
             lambda: upload_folder(
                 folder_path=str(local_root),
                 repo_id=repo_id,
@@ -117,7 +133,9 @@ async def push_to_hf() -> None:
         _state["pending_push"] = False
         logger.info("Persisted data pushed to %s", repo_id)
     except Exception as e:  # noqa: BLE001
-        logger.error("Persist push failed: %s", e)
+        # ✅ 失败也重置 flag, 否则 schedule_push 永远 short-circuit, 数据再也不推
+        _state["pending_push"] = False
+        logger.error("Persist push failed: %s", e, exc_info=True)
 
 
 async def schedule_push() -> None:
@@ -140,7 +158,11 @@ async def schedule_push() -> None:
         if _state["pending_push"]:
             await push_to_hf()
 
-    asyncio.create_task(_delayed_push())
+    # ✅ 持引用, 避免 asyncio.create_task 出来的 task 在 30s sleep 期间被 GC
+    # 后果: pending_push=True 永久卡死, 新上传也无法 push
+    task = asyncio.create_task(_delayed_push())
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 async def _ensure_repo_exists() -> None:
@@ -150,7 +172,7 @@ async def _ensure_repo_exists() -> None:
     loop = asyncio.get_running_loop()
     try:
         await loop.run_in_executor(
-            None,
+            _persist_executor,  # ✅ 独立池
             lambda: create_repo(
                 repo_id=repo_id,
                 repo_type="dataset",
@@ -161,7 +183,7 @@ async def _ensure_repo_exists() -> None:
         )
         logger.info("Created persist repo: %s", repo_id)
     except Exception as e:  # noqa: BLE001
-        logger.error("Failed to create persist repo: %s", e)
+        logger.error("Failed to create persist repo: %s", e, exc_info=True)
 
 
 def persist_status() -> dict:

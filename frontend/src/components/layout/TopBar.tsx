@@ -1,10 +1,12 @@
 /**
- * 顶部栏: 标题 + 状态指示.
+ * 顶部栏: 标题 + 状态指示 + 侧栏切换按钮.
  */
-import { Activity, Cpu, Database, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Cpu, Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Wifi, WifiOff } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { healthApi } from '@/lib/api';
+import { useUIStore } from '@/stores/uiStore';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 export function TopBar() {
@@ -14,6 +16,11 @@ export function TopBar() {
     refetchInterval: 10000,
     retry: 0,
   });
+
+  const sidebarOpen = useUIStore((s) => s.sidebarOpen);
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar);
+  const rightOpen = useUIStore((s) => s.rightSidebarOpen);
+  const toggleRight = useUIStore((s) => s.toggleRightSidebar);
 
   const online = !isError && health?.llm;
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
@@ -62,6 +69,25 @@ export function TopBar() {
           <Cpu className="h-3 w-3" />
           {health?.llm ? 'LLM ✓' : 'LLM ✗'}
         </Badge>
+        <div className="mx-1 h-5 w-px bg-border" />
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={toggleSidebar}
+          title={sidebarOpen ? '折叠左侧' : '展开左侧'}
+          aria-label="切换左侧栏"
+        >
+          {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={toggleRight}
+          title={rightOpen ? '折叠历史对话' : '展开历史对话'}
+          aria-label="切换历史对话栏"
+        >
+          {rightOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+        </Button>
       </div>
     </header>
   );
