@@ -81,8 +81,17 @@ export const useChatStore = create<ChatState>()(
     setSessionId: (id) => set({ sessionId: id }),
     // 不再 wipe messages; 由调用方显式调用 reset() / loadSessionMessages()
 
-    /** 从后端 SessionDetail.messages 加载历史到当前 store. 替换现有 messages. */
+    /** 从后端 SessionDetail.messages 加载历史到当前 store. 替换现有 messages.
+     *
+     * 关键 guard: 如果正在 streaming, 跳过 (避免切到旧 session 时把刚 send 的 user +
+     * 空 assistant 覆盖). 调用方应在切换 session 前先 stop() 当前流.
+     */
     loadSessionMessages: (msgs) => {
+      if (get().isStreaming) {
+        // 切到历史 session 时, 旧 session 的流还未结束 — 保留当前 messages,
+        // 让用户先 stop 再切 (或忽略, 由 UI 处理).
+        return;
+      }
       const messages: ChatMessage[] = (msgs ?? []).map((m) => ({
         id: m.id,
         role: m.role as ChatMessage['role'],
@@ -169,7 +178,8 @@ export const useChatStore = create<ChatState>()(
             content: acc + outContent,
             thinking: think + outThink,
             _thinkState: state,
-            _thinkBuf: '',  // 已消费完
+            // 关键: 保留未消费的部分 (<think> 在 chunk 边界被切时, 下次再拼)
+            _thinkBuf: stream.slice(cursor),
           };
         }),
       }));

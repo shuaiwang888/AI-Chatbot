@@ -32,11 +32,14 @@ export function SessionHistoryPanel() {
   const currentDetail = useSession(sessionId || null);
 
   // sessionId 切换时, 加载该 session 的消息进 store
+  // 关键: deps 只跟 sessionId. currentDetail.data 引用变化 (轮询) 不重载,
+  // 否则会覆盖正在 streaming 的 user + 空 assistant.
   useEffect(() => {
     if (sessionId && currentDetail.data) {
       loadSessionMessages(currentDetail.data.messages);
     }
-  }, [sessionId, currentDetail.data, loadSessionMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   const handleNew = useCallback(() => {
     reset();
