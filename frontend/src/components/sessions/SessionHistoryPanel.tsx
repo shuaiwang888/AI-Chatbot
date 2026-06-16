@@ -8,6 +8,7 @@
  * 点击 session 触发 onSelect (切 sessionId + 加载消息).
  */
 import { useCallback, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus } from 'lucide-react';
 
 import { useChatStore } from '@/stores/chatStore';
@@ -28,6 +29,7 @@ export function SessionHistoryPanel() {
 
   const sessionsQ = useSessions(50);
   const createMut = useCreateSession();
+  const queryClient = useQueryClient();
   // 当前 session 的详情 (供点击时加载消息). 复用缓存.
   const currentDetail = useSession(sessionId || null);
 
@@ -42,17 +44,24 @@ export function SessionHistoryPanel() {
   }, [sessionId]);
 
   const handleNew = useCallback(() => {
-    // 关键: 先同步清空 messages, 避免 useEffect 异步加载到旧 session 的内容
+    // 关键路径 (按顺序):
+    // 1. 删掉所有 useSession cache — 防止旧 session 的 messages 仍被缓存, 切时刷出来
+    // 2. reset() 清 messages + currentAssistantId + isStreaming
+    // 3. 显式 loadSessionMessages([]) — 保险, 不被 useEffect 异步覆盖
+    // 4. setSessionId('') — 触发 useSession('') 不跑 (enabled:!!sessionId)
+    // 5. createMut 创建新 session, onSuccess 拿到新 id, setSessionId(新id) 触发 useSession(新id)
+    //    此时 useSession 是新 query key, 无 cache, fetch 后 currentDetail.data.messages=[],
+    //    useEffect 触发 loadSessionMessages([]) 保持空
+    queryClient.removeQueries({ queryKey: ['sessions'] });
     reset();
+    loadSessionMessages([]);
     setSessionId('');
     createMut.mutate(undefined, {
       onSuccess: (res) => {
         setSessionId(res.session_id);
-        // 新 session 必无 messages, 显式清空, 防止 useSession 返回旧 cache
-        loadSessionMessages([]);
       },
     });
-  }, [reset, setSessionId, createMut, loadSessionMessages]);
+  }, [queryClient, reset, loadSessionMessages, setSessionId, createMut]);
 
   const handleSelect = useCallback(
     (id: string) => {

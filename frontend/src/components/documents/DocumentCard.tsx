@@ -32,17 +32,14 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
   const isWorking = ['uploading', 'parsing', 'embedding'].includes(doc.status);
 
   const [detailOpen, setDetailOpen] = useState(false);
-  const [confirmDel, setConfirmDel] = useState(false);
 
   const onCardClick = () => setDetailOpen(true);
   const onDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirmDel) {
-      setConfirmDel(true);
-      setTimeout(() => setConfirmDel(false), 3000);
-      return;
+    // 一次点击直接弹原生确认框 (用户要求)
+    if (window.confirm(`确认删除文档"${doc.filename}"?\n\n该操作不可撤销.`)) {
+      del.mutate(doc.id);
     }
-    del.mutate(doc.id);
   };
 
   return (
@@ -96,32 +93,27 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
             <p className="text-[10px] text-destructive line-clamp-2">⚠️ {doc.error}</p>
           )}
 
-          {/* 操作按钮 (默认 60% 透明, hover 全显 — 触屏/键盘也能看见) */}
-          <div className="flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100 hover:opacity-100">
+          {/* 操作按钮 (icon-only, 默认 60% 透明, hover 全显 — 触屏/键盘也能看见) */}
+          <div className="flex items-center gap-0.5 opacity-70 transition-opacity group-hover:opacity-100 focus-within:opacity-100 hover:opacity-100">
             <Button
               variant="ghost"
-              size="sm"
-              className="h-6 px-2 text-[10px]"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-foreground"
               onClick={(e) => { e.stopPropagation(); setDetailOpen(true); }}
               title="查看详情 / chunks 预览"
             >
-              <Eye className="mr-1 h-3 w-3" />
-              详情
+              <Eye className="h-3 w-3" />
             </Button>
             <div className="flex-1" />
             <Button
-              variant={confirmDel ? 'destructive' : 'ghost'}
-              size="sm"
-              className={cn(
-                'h-6 px-2 text-[10px]',
-                !confirmDel && 'text-muted-foreground hover:text-destructive',
-              )}
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-muted-foreground hover:text-destructive"
               onClick={onDelete}
               disabled={del.isPending}
-              title={confirmDel ? '再次点击确认删除' : '删除'}
+              title="删除文档"
             >
-              <Trash2 className="mr-1 h-3 w-3" />
-              {confirmDel ? '确认删除' : '删除'}
+              {del.isPending ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3 w-3" />}
             </Button>
           </div>
         </CardContent>

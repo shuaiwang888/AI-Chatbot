@@ -26,7 +26,6 @@ export interface SessionListItemProps {
 export function SessionListItem({ session, active, onSelect, collapsed }: SessionListItemProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(session.title ?? '');
-  const [confirmDel, setConfirmDel] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const del = useDeleteSession();
   const rename = useRenameSession();
@@ -34,13 +33,6 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
   useEffect(() => {
     if (editing) inputRef.current?.select();
   }, [editing]);
-
-  // 3 秒后取消删除确认
-  useEffect(() => {
-    if (!confirmDel) return;
-    const t = setTimeout(() => setConfirmDel(false), 3000);
-    return () => clearTimeout(t);
-  }, [confirmDel]);
 
   const title = session.title?.trim() || 'Untitled chat';
 
@@ -56,11 +48,10 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
 
   function handleDelete(e: React.MouseEvent) {
     e.stopPropagation();
-    if (!confirmDel) {
-      setConfirmDel(true);
-      return;
+    // 一次点击直接弹原生确认框 (用户要求)
+    if (window.confirm(`确认删除对话"${title}"?\n\n该操作不可撤销.`)) {
+      del.mutate(session.id);
     }
-    del.mutate(session.id);
   }
 
   if (collapsed) {
@@ -183,14 +174,14 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleDelete}
-                className={cn(confirmDel && 'text-destructive focus:text-destructive')}
+                className="text-destructive focus:text-destructive"
               >
                 {del.isPending ? (
                   <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" />
                 ) : (
                   <Trash2 className="mr-2 h-3.5 w-3.5" />
                 )}
-                {confirmDel ? '确认删除?' : '删除'}
+                删除
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
