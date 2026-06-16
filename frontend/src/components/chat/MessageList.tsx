@@ -22,9 +22,17 @@ export function MessageList() {
   if (messages.length === 0) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
-        <div className="text-center">
-          <div className="text-4xl">💬</div>
-          <p className="mt-3 text-sm">开始提问吧. 上传文档后, Agent 会基于你的知识库回答.</p>
+        <div className="max-w-md text-center">
+          <div className="mb-3 flex justify-center gap-3 text-3xl">
+            <span title="知识库">📚</span>
+            <span title="Agent">🤖</span>
+            <span title="引用源">💡</span>
+          </div>
+          <p className="text-sm font-medium text-foreground/80">开始提问吧</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            上传 PDF / Word / 图片到左侧 <strong>知识库</strong>,
+            <br />Agent 会基于你的文档回答, 并标注 <strong>引用源</strong>.
+          </p>
         </div>
       </div>
     );

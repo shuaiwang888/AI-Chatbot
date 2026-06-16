@@ -49,7 +49,7 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
     <>
       <Card
         className={cn(
-          'group cursor-pointer transition-colors hover:border-primary/50',
+          'group cursor-pointer border border-border transition-colors hover:border-primary/60',
           isWorking && 'border-sky-300/60 bg-sky-50/30 dark:bg-sky-950/10',
         )}
         onClick={onCardClick}
@@ -96,8 +96,8 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
             <p className="text-[10px] text-destructive line-clamp-2">⚠️ {doc.error}</p>
           )}
 
-          {/* 操作按钮 (hover 显出) */}
-          <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {/* 操作按钮 (默认 60% 透明, hover 全显 — 触屏/键盘也能看见) */}
+          <div className="flex items-center gap-1 opacity-60 transition-opacity group-hover:opacity-100 focus-within:opacity-100 hover:opacity-100">
             <Button
               variant="ghost"
               size="sm"

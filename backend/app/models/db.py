@@ -287,13 +287,22 @@ def chunk_delete_by_doc(doc_id: str) -> int:
 
 # ========== Session / Message CRUD (阶段 3 实际使用) ==========
 def session_upsert(session_id: str, user_id: str = "default", title: str | None = None) -> None:
+    """插入或更新 session 行.
+
+    关键: ON CONFLICT 时, title 用 COALESCE(sessions.title, excluded.title):
+    - 原 title 已设: 保留原 title (不覆盖)
+    - 原 title 为空: 用新 title (auto_title 首次写)
+    这样调用方传 title=None 时不会清掉已有标题, 传有效 title 时只在原空时写入.
+    """
     now = time.time()
     conn = get_conn()
     conn.execute(
         """
         INSERT INTO sessions (id, user_id, title, message_count, created_at, updated_at)
         VALUES (?, ?, ?, 0, ?, ?)
-        ON CONFLICT(id) DO UPDATE SET updated_at = excluded.updated_at
+        ON CONFLICT(id) DO UPDATE SET
+            title = COALESCE(sessions.title, excluded.title),
+            updated_at = excluded.updated_at
         """,
         (session_id, user_id, title, now, now),
     )

@@ -42,14 +42,17 @@ export function SessionHistoryPanel() {
   }, [sessionId]);
 
   const handleNew = useCallback(() => {
+    // 关键: 先同步清空 messages, 避免 useEffect 异步加载到旧 session 的内容
     reset();
     setSessionId('');
     createMut.mutate(undefined, {
       onSuccess: (res) => {
         setSessionId(res.session_id);
+        // 新 session 必无 messages, 显式清空, 防止 useSession 返回旧 cache
+        loadSessionMessages([]);
       },
     });
-  }, [reset, setSessionId, createMut]);
+  }, [reset, setSessionId, createMut, loadSessionMessages]);
 
   const handleSelect = useCallback(
     (id: string) => {

@@ -159,7 +159,10 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
       </div>
       {!editing && (
         <div
-          className="flex shrink-0 items-center gap-0.5 opacity-0 transition group-hover:opacity-100"
+          className={cn(
+            'flex shrink-0 items-center gap-0.5 opacity-60 transition-opacity',
+            'group-hover:opacity-100 focus-within:opacity-100 hover:opacity-100',
+          )}
           onClick={(e) => e.stopPropagation()}
         >
           <DropdownMenu>
