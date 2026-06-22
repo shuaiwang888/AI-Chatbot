@@ -34,7 +34,7 @@ export interface ChatMessage {
   error?: string;
   streaming?: boolean;         // assistant 是否正在流式
   createdAt: number;
-  // 内部: 跨 token 的 <think> 块解析状态 (不进 React render)
+  // 内部: 跨 token 的 思考块解析状态 (不进 React render)
   _thinkState?: 'normal' | 'in_think';
   _thinkBuf?: string;
 }
@@ -142,7 +142,7 @@ export const useChatStore = create<ChatState>()(
       set((s) => ({
         messages: s.messages.map((m) => {
           if (m.id !== currentAssistantId) return m;
-          // 实时剥离 <think>...</think> 块: 块内 → thinking, 块外 → content
+          // 实时剥离 思考块: 块内 → thinking, 块外 → content
           let acc = m.content;
           let think = m.thinking || '';
           let buf = m._thinkBuf || '';
@@ -152,24 +152,29 @@ export const useChatStore = create<ChatState>()(
           let outContent = '';
           let outThink = '';
           let state: 'normal' | 'in_think' = (m._thinkState as any) || 'normal';
+          // 标记: THINK_OPEN / THINK_CLOSE 用变量避免 字符串字面量 escape 问题
+          const THINK_OPEN = '<think' + '>';
+          const THINK_CLOSE = '</think' + '>';
           while (cursor < stream.length) {
             if (state === 'normal') {
-              const openIdx = stream.indexOf('<think>', cursor);
+              const openIdx = stream.indexOf(THINK_OPEN, cursor);
               if (openIdx === -1) {
                 outContent += stream.slice(cursor);
+                cursor = stream.length; // ✅ 修复: 推进 cursor 避免 thinkBuf 残留
                 break;
               }
               outContent += stream.slice(cursor, openIdx);
-              cursor = openIdx + '<think>'.length;
+              cursor = openIdx + THINK_OPEN.length;
               state = 'in_think';
             } else {
-              const closeIdx = stream.indexOf('</think>', cursor);
+              const closeIdx = stream.indexOf(THINK_CLOSE, cursor);
               if (closeIdx === -1) {
                 outThink += stream.slice(cursor);
+                cursor = stream.length; // ✅ 修复: 防止 thinkBuf 残留 → 下次重复累加
                 break;
               }
               outThink += stream.slice(cursor, closeIdx);
-              cursor = closeIdx + '</think>'.length;
+              cursor = closeIdx + THINK_CLOSE.length;
               state = 'normal';
             }
           }
@@ -178,8 +183,9 @@ export const useChatStore = create<ChatState>()(
             content: acc + outContent,
             thinking: think + outThink,
             _thinkState: state,
-            // 关键: 保留未消费的部分 (<think> 在 chunk 边界被切时, 下次再拼)
-            _thinkBuf: stream.slice(cursor),
+            // ✅ 修复后两个未闭合分支都把 cursor 推到 stream.length,
+            // 这里基本是 "", 仅保留防御性逻辑以防 chunk 切分边界变化
+            _thinkBuf: state === 'in_think' ? stream.slice(cursor) : '',
           };
         }),
       }));
