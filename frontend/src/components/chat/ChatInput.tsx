@@ -24,6 +24,14 @@ export function ChatInput({ sessionId, docIds, placeholder }: ChatInputProps) {
   const submit = useCallback(async () => {
     const msg = text.trim();
     if (!msg || isStreaming) return;
+    // ⚠️ 自动新建对话的 50ms 窗口: SessionHistoryPanel 触发 handleNew →
+    // POST /sessions → setSessionId(新id). 此期间 sessionId 为 '',
+    // send() 会被 useChatStream 拒绝 (返回 error). 等几百毫秒后用户重发即可.
+    // 这里额外判断, 直接拒绝避免误发到错误 session.
+    if (!sessionId) {
+      console.warn('[ChatInput] sessionId empty, please retry after auto-create completes');
+      return;
+    }
     setText('');
     if (taRef.current) taRef.current.style.height = 'auto';
     try {
@@ -83,8 +91,8 @@ export function ChatInput({ sessionId, docIds, placeholder }: ChatInputProps) {
             <Button
               size="icon"
               onClick={submit}
-              disabled={!text.trim()}
-              title="发送 (Enter)"
+              disabled={!text.trim() || !sessionId}
+              title={sessionId ? '发送 (Enter)' : '正在准备对话…'}
             >
               <Send className="h-4 w-4" />
             </Button>

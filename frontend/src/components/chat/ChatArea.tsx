@@ -1,33 +1,26 @@
 /**
  * ChatArea 容器. 包含 MessageList + ChatInput.
  *
- * sessionId 解析:
- * - 优先用 store.sessionId (右侧栏/handleNew 写入)
- * - 首次 mount 时若 store 为空, 把 fallback (localStorage uuid) 写回 store
- *   (保证 ChatInput 始终有 id, 避免 useChatStream.send 内 store vs params 比较永远为 true)
+ * sessionId 来源:
+ * - 只用 store.sessionId (右侧栏 / 自动创建 / 历史点击 写入)
+ * - ⚠️ 不再用 localStorage fallback: 之前代码在 ChatArea mount 时
+ *   从 localStorage 读上次的 sessionId 写回 store, 导致用户刷新页面
+ *   自动进入"上次那个对话". 用户反馈: 期望"首次打开项目应该是新建对话".
  *
- * 关键: useEffect 只在 mount 时跑一次. deps 故意不跟 storedId,
- * 否则用户点 +新对话 setSessionId('') 时 effect 会重跑, 把 fallback 写回,
- * 导致 useSession(fallback) 加载旧 session 消息, +新对话就显示旧窗口.
+ *   现在首次打开 store 是空的, MessageList 显示欢迎页.
+ *   SessionHistoryPanel 在 mount 时如果 store.sessionId=='' 自动调
+ *   handleNew() 建新 session → setSessionId(新id) → 进入全新对话.
+ *
+ *   注意: ChatInput 拿到的 sessionId 可能是空字符串 (在自动新建的
+ *   异步过程中, 几毫秒), 这种短暂窗口 send() 会被禁用 (见 useChatStream
+ *   的 isPending / 校验). 不影响正常使用.
  */
-import { useEffect, useState } from 'react';
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
 import { useChatStore } from '@/stores/chatStore';
-import { getOrCreateSessionId } from '@/lib/utils';
 
 export function ChatArea() {
-  const storedId = useChatStore((s) => s.sessionId);
-  const setSessionId = useChatStore((s) => s.setSessionId);
-  // 兜底 id: 启动时从 localStorage 取 (固定 uuid), 仅 mount 时写回 store.
-  const [fallbackId] = useState(() => getOrCreateSessionId());
-  useEffect(() => {
-    if (!storedId && fallbackId) {
-      setSessionId(fallbackId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // mount-only
-  const sessionId = storedId || fallbackId;
+  const sessionId = useChatStore((s) => s.sessionId);
 
   return (
     <div className="flex h-full flex-col">

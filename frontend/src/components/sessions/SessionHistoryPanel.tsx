@@ -9,7 +9,7 @@
  * - handleSelect 立即清 messages + 设 isStreaming 标志, MessageList 显示 spinner,
  *   给用户"我正在切"的视觉反馈 (之前的 1-3 秒空白期用户会以为没点中).
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus } from 'lucide-react';
 
@@ -58,6 +58,20 @@ export function SessionHistoryPanel() {
       },
     });
   }, [queryClient, reset, loadSessionMessages, setSessionId, createMut]);
+
+  // ⚡ 自动新建对话 (首次打开 / 刷新页面):
+  // 修复前 ChatArea 用 localStorage fallback, 刷新 = 自动恢复上次对话.
+  // 用户期望"首次打开应该是新建对话" → 这里 store 空就触发 handleNew 一次.
+  // 用 ref 防 React 18 strict mode 双重 mount 导致的两次 create.
+  const autoCreatedRef = useRef(false);
+  useEffect(() => {
+    if (autoCreatedRef.current) return;
+    if (sessionId) return;            // 已有 session, 不动
+    if (createMut.isPending) return;  // 已经在建, 等它完成
+    autoCreatedRef.current = true;
+    handleNew();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSelect = useCallback(
     (id: string) => {
