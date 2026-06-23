@@ -2,23 +2,24 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    /* 深紫蓝主题 (类似 React Bits 演示站) — 默认整体深色背景 */
+    --background: 232 35% 11%;
+    --foreground: 210 40% 98%;
+    --card: 232 30% 14%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 232 30% 18%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 232 30% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 232 30% 20%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 232 30% 22%;
+    --input: 232 30% 22%;
+    --ring: 217 91% 60%;
     --radius: 0.5rem;
   }
 

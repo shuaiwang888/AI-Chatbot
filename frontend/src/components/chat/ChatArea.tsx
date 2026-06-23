@@ -36,14 +36,14 @@ export function ChatArea() {
       {/* 背景光束层 (WebGL, pointer-events-none 不挡交互) */}
       {showFluidBackground && (
         <div
-          className="pointer-events-none absolute inset-0 -z-10 mix-blend-screen opacity-70"
+          className="pointer-events-none absolute inset-0 -z-10 mix-blend-screen opacity-60"
         >
           <LightRays
             raysOrigin="top-center"
-            raysColor="#7dd3fc"
-            raysSpeed={0.8}
-            lightSpread={0.6}
-            rayLength={1.5}
+            raysColor="#8b9eff"
+            raysSpeed={0.6}
+            lightSpread={0.55}
+            rayLength={1.6}
             followMouse={true}
             mouseInfluence={0.15}
             noiseAmount={0.05}
