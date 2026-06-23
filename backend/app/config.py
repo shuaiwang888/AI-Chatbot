@@ -48,7 +48,7 @@ class Settings(BaseSettings):
 
     # ========== App ==========
     app_name: str = "ai-chatbot"
-    app_version: str = "0.1.0"
+    app_version: str = "1.0.0"
     app_host: str = "0.0.0.0"
     app_port: int = 7860
     log_level: str = "INFO"

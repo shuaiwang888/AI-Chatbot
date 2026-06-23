@@ -1,5 +1,5 @@
 """ai-chatbot backend application."""
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 # Monkey patch transformers to bypass torch.load safety check on old PyTorch versions (macOS x86_64)
 try:
