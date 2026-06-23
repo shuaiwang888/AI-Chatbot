@@ -1,7 +1,7 @@
 /**
  * 顶部栏: 标题 + 状态指示 + 侧栏切换按钮.
  */
-import { Activity, Cpu, Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Cpu, Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { healthApi } from '@/lib/api';
 import { useUIStore } from '@/stores/uiStore';
@@ -21,6 +21,8 @@ export function TopBar() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar);
   const rightOpen = useUIStore((s) => s.rightSidebarOpen);
   const toggleRight = useUIStore((s) => s.toggleRightSidebar);
+  const showFluid = useUIStore((s) => s.showFluidBackground);
+  const toggleFluid = useUIStore((s) => s.toggleFluidBackground);
 
   const online = !isError && health?.llm;
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
@@ -72,6 +74,16 @@ export function TopBar() {
           {health?.llm ? 'LLM ✓' : 'LLM ✗'}
         </Badge>
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+        <Button
+          size="icon"
+          variant={showFluid ? 'secondary' : 'ghost'}
+          onClick={toggleFluid}
+          title={showFluid ? '关闭流体背景' : '开启流体背景'}
+          aria-label="切换流体背景"
+          className="shrink-0"
+        >
+          <Sparkles className="h-4 w-4" />
+        </Button>
         <Button
           size="icon"
           variant="ghost"
