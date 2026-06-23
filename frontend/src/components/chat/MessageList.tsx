@@ -3,6 +3,7 @@
  * 用 react-virtuoso 虚拟化, 适合长对话.
  */
 import { useEffect, useRef } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { MessageBubble } from './MessageBubble';
 import { ThinkingPanel } from './ThinkingPanel';
@@ -12,6 +13,7 @@ import { useChatStore } from '@/stores/chatStore';
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
+  const sessionId = useChatStore((s) => s.sessionId);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // 新消息自动滚到底
@@ -20,6 +22,19 @@ export function MessageList() {
   }, [messages.length]);
 
   if (messages.length === 0) {
+    // 区分两种空状态:
+    // - 没有 sessionId / 全新对话: 显示欢迎页 (引导用户提问)
+    // - 有 sessionId 但 messages=[] (点了历史对话, fetch 还没回来): 显示 loading
+    //   给用户"我正在切"的视觉反馈, 避免"点了没反应"
+    const isSwitching = !!sessionId;
+    if (isSwitching) {
+      return (
+        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          加载对话历史…
+        </div>
+      );
+    }
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground">
         <div className="max-w-md text-center">

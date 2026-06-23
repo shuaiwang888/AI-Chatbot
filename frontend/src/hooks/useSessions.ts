@@ -16,12 +16,39 @@ export function useSessions(limit = 50) {
   });
 }
 
+/** 详情查询 (被 SessionHistoryPanel 用, 用于"打开某条历史"后的额外 detail 缓存).
+ *  注意: 真正的"点击 session 后立即把 messages 写进 chatStore" 在
+ *  useSelectSession 里用 mutation + onSuccess 完成, 这里只是被动缓存.
+ *  所以即便这里 staleTime 长也不会"点了没反应".
+ */
 export function useSession(sessionId: string | null) {
   return useQuery<SessionDetail>({
     queryKey: ['sessions', sessionId],
     queryFn: () => sessionsApi.get(sessionId!),
     enabled: !!sessionId,
-    staleTime: 60_000, // 历史会话不变, 长 stale
+    staleTime: 60_000,
+  });
+}
+
+/** ⚡ 主动切换 session (点击历史对话用).
+ *
+ * 返回的 mutation.onSuccess(detail) 由调用方决定怎么 dispatch 进 chatStore.
+ * 不在本 hook 内直接 import chatStore — 避免循环依赖 (chatStore 也 import 自 hooks).
+ *
+ * 用 mutation 而不是 useQuery 的原因:
+ * - useQuery 是被动订阅, 数据 ready 时只更新 cache, 调用方需 useEffect 二次桥接
+ *   → 容易出现 deps 不全导致 "点了没反应" 的竞态
+ * - useMutation 是 imperative, onSuccess(detail) 同步拿到结果,
+ *   → 调用方 1 行 .mutate(id) → 自动 fetch → onSuccess(detail) 写 store
+ */
+export function useSelectSession() {
+  const qc = useQueryClient();
+  return useMutation<SessionDetail, Error, string>({
+    mutationFn: (sessionId: string) => sessionsApi.get(sessionId),
+    onSuccess: (detail) => {
+      // 塞进 query cache (复用, 后续 useSession 命中 cache 不重 fetch)
+      qc.setQueryData(['sessions', detail.session.id], detail);
+    },
   });
 }
 
@@ -39,8 +66,9 @@ export function useDeleteSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: string) => sessionsApi.delete(sessionId),
-    onSuccess: () => {
+    onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: KEY });
+      qc.removeQueries({ queryKey: ['sessions', vars] });
     },
   });
 }
@@ -62,3 +90,4 @@ export function sortSessions(sessions: SessionMeta[] | undefined): SessionMeta[]
   if (!sessions) return [];
   return [...sessions].sort((a, b) => b.updated_at - a.updated_at);
 }
+

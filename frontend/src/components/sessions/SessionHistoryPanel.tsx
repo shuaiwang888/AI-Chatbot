@@ -1,13 +1,15 @@
 /**
  * 历史对话右栏. 镜像左侧 Sidebar 模式: 可折叠 (w-80/w-12), 默认展开.
  *
- * - 顶部: + 新对话按钮 + 折叠按钮
- * - 中间: session 列表 (TanStack Query useSessions, 30s 轮询)
- * - 底部: 空状态 / loading / error
- *
- * 点击 session 触发 onSelect (切 sessionId + 加载消息).
+ * 关键交互修复 (vs 旧版本):
+ * - 旧版用 useEffect 看 [sessionId], 闭包里用 currentDetail.data, 但 React 18
+ *   不会因为 data 变化重跑 effect (deps 只看 sessionId), 导致"点了没反应".
+ * - 新版用 useSelectSession (mutation): 点击 → mutate(id) → 后台 fetch →
+ *   onSuccess(detail) 同步把 messages 写进 chatStore. 不依赖 useEffect 桥接.
+ * - handleSelect 立即清 messages + 设 isStreaming 标志, MessageList 显示 spinner,
+ *   给用户"我正在切"的视觉反馈 (之前的 1-3 秒空白期用户会以为没点中).
  */
-import { useCallback, useEffect, useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus } from 'lucide-react';
 
@@ -15,7 +17,12 @@ import { useChatStore } from '@/stores/chatStore';
 import { useUIStore } from '@/stores/uiStore';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useCreateSession, useSession, useSessions, sortSessions } from '@/hooks/useSessions';
+import {
+  useCreateSession,
+  useSelectSession,
+  useSessions,
+  sortSessions,
+} from '@/hooks/useSessions';
 import { SessionListItem } from './SessionListItem';
 import { cn } from '@/lib/utils';
 
@@ -29,29 +36,17 @@ export function SessionHistoryPanel() {
 
   const sessionsQ = useSessions(50);
   const createMut = useCreateSession();
+  const selectMut = useSelectSession();
   const queryClient = useQueryClient();
-  // 当前 session 的详情 (供点击时加载消息). 复用缓存.
-  const currentDetail = useSession(sessionId || null);
-
-  // sessionId 切换时, 加载该 session 的消息进 store
-  // 关键: deps 只跟 sessionId. currentDetail.data 引用变化 (轮询) 不重载,
-  // 否则会覆盖正在 streaming 的 user + 空 assistant.
-  useEffect(() => {
-    if (sessionId && currentDetail.data) {
-      loadSessionMessages(currentDetail.data.messages);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sessionId]);
 
   const handleNew = useCallback(() => {
-    // 关键路径 (按顺序):
-    // 1. 删掉所有 useSession cache — 防止旧 session 的 messages 仍被缓存, 切时刷出来
+    // 路径:
+    // 1. 删掉所有 useSelectSession cache — 防止旧 session 的 messages 仍被缓存
     // 2. reset() 清 messages + currentAssistantId + isStreaming
-    // 3. 显式 loadSessionMessages([]) — 保险, 不被 useEffect 异步覆盖
-    // 4. setSessionId('') — 触发 useSession('') 不跑 (enabled:!!sessionId)
-    // 5. createMut 创建新 session, onSuccess 拿到新 id, setSessionId(新id) 触发 useSession(新id)
-    //    此时 useSession 是新 query key, 无 cache, fetch 后 currentDetail.data.messages=[],
-    //    useEffect 触发 loadSessionMessages([]) 保持空
+    // 3. 显式 loadSessionMessages([]) — 保险, 立即给用户空状态视觉反馈
+    // 4. setSessionId('') — 中断当前 sessionId 引用
+    // 5. createMut 创建新 session, onSuccess 拿到新 id, setSessionId(新id)
+    //    (注意: 新 session 的 detail 不需要 fetch, messages 永远是空, 不调 selectMut)
     queryClient.removeQueries({ queryKey: ['sessions'] });
     reset();
     loadSessionMessages([]);
@@ -66,10 +61,29 @@ export function SessionHistoryPanel() {
   const handleSelect = useCallback(
     (id: string) => {
       if (id === sessionId) return;
+      // ⚡ 立即视觉反馈:
+      // - 切 sessionId 让左栏标题更新
+      // - 清空 messages 让 MessageList 立刻显示 loading 状态
+      //   (而不是等到 1-3 秒后 fetch 完成才换)
       setSessionId(id);
-      // 消息加载由上面的 useEffect 在 currentDetail.data 准备好后触发
+      loadSessionMessages([]);
+
+      // ⚡ 主动 fetch + onSuccess 写 store (替代不可靠的 useEffect):
+      // mutation 在 mutationKey 变化时不会重跑, 所以这里手动 cancel + reset,
+      // 确保不会因为之前 in-flight 的 mutation 结果覆盖新 session 的 messages.
+      selectMut.reset();
+      selectMut.mutate(id, {
+        onSuccess: (detail) => {
+          // ⚠️ 防止"用户在新 session 还没来时又点了别的 session"的竞态:
+          // 只在当前 sessionId 仍然是这个 id 时才写 store
+          const currentId = useChatStore.getState().sessionId;
+          if (currentId === id) {
+            loadSessionMessages(detail.messages);
+          }
+        },
+      });
     },
-    [sessionId, setSessionId],
+    [sessionId, setSessionId, loadSessionMessages, selectMut],
   );
 
   const sessions = useMemo(() => sortSessions(sessionsQ.data?.sessions), [sessionsQ.data]);
