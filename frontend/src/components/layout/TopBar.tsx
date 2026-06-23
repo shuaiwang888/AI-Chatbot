@@ -26,32 +26,34 @@ export function TopBar() {
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex items-center gap-2">
-        <div className="text-xl">🤖</div>
-        <div>
-          <h1 className="text-sm font-semibold leading-none">AI Chatbot</h1>
-          <p className="text-[10px] text-muted-foreground">
+    <header className="flex h-14 min-w-0 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      {/* 左侧 logo + title. min-w-0 让标题区可压缩, 不会撑爆 TopBar */}
+      <div className="flex min-w-0 shrink items-center gap-2">
+        <div className="shrink-0 text-xl">🤖</div>
+        <div className="min-w-0">
+          <h1 className="truncate text-sm font-semibold leading-none">AI Chatbot</h1>
+          <p className="truncate text-[10px] text-muted-foreground">
             私人 Agent 智能客服 · v{health?.version || '...'}
           </p>
         </div>
       </div>
 
-      <div className="ml-auto flex items-center gap-2 text-xs">
+      {/* 右侧状态 + 切换. shrink-0 保证不被挤压, ml-auto 推到右边 */}
+      <div className="ml-auto flex shrink-0 items-center gap-1.5 text-xs">
         {isLoading ? (
           <Badge variant="secondary">检查中…</Badge>
         ) : isError || !online ? (
-          <Badge variant="destructive" className="gap-1">
+          <Badge variant="destructive" className="hidden gap-1 sm:inline-flex">
             <WifiOff className="h-3 w-3" /> 后端离线
           </Badge>
         ) : (
-          <Badge variant="success" className="gap-1">
+          <Badge variant="success" className="hidden gap-1 sm:inline-flex">
             <Wifi className="h-3 w-3" /> 在线
           </Badge>
         )}
         <Badge
           variant={health?.chroma ? 'success' : 'secondary'}
-          className="gap-1"
+          className="hidden gap-1 md:inline-flex"
           title="ChromaDB 向量库"
         >
           <Database className="h-3 w-3" />
@@ -59,23 +61,24 @@ export function TopBar() {
         </Badge>
         <Badge
           variant={persistOn ? 'info' : 'secondary'}
-          className="gap-1"
+          className="hidden gap-1 lg:inline-flex"
           title={`持久化模式: ${health?.persist?.mode || '?'}`}
         >
           <Activity className="h-3 w-3" />
           {persistOn ? 'HF Persist' : 'Local only'}
         </Badge>
-        <Badge variant="outline" className={cn('gap-1')}>
+        <Badge variant="outline" className="hidden gap-1 xl:inline-flex">
           <Cpu className="h-3 w-3" />
           {health?.llm ? 'LLM ✓' : 'LLM ✗'}
         </Badge>
-        <div className="mx-1 h-5 w-px bg-border" />
+        <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
         <Button
           size="icon"
           variant="ghost"
           onClick={toggleSidebar}
           title={sidebarOpen ? '折叠左侧' : '展开左侧'}
           aria-label="切换左侧栏"
+          className="shrink-0"
         >
           {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
         </Button>
@@ -85,6 +88,7 @@ export function TopBar() {
           onClick={toggleRight}
           title={rightOpen ? '折叠历史对话' : '展开历史对话'}
           aria-label="切换历史对话栏"
+          className="shrink-0"
         >
           {rightOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
         </Button>

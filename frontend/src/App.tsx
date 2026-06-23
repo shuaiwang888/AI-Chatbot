@@ -19,11 +19,11 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>
-        <div className="flex h-full flex-col">
+        <div className="flex h-full min-w-0 flex-col">
           <TopBar />
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 min-w-0 overflow-hidden">
             <Sidebar />
-            <main className="flex-1 overflow-hidden">
+            <main className="flex-1 min-w-0 overflow-hidden">
               <AppRouter />
             </main>
             <SessionHistoryPanel />

@@ -55,11 +55,11 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
           <div className="flex items-start gap-2.5">
             <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <span className="truncate text-sm font-medium" title={doc.filename}>
-                  {truncateFilename(doc.filename, 26)}
+              <div className="flex items-start gap-1.5">
+                <span className="line-clamp-2 min-w-0 flex-1 break-all text-sm font-medium" title={doc.filename}>
+                  {truncateFilename(doc.filename, 60)}
                 </span>
-                <Badge variant={status.variant} className="ml-auto shrink-0 gap-1">
+                <Badge variant={status.variant} className="shrink-0 gap-1">
                   <Icon className={cn('h-3 w-3', isWorking && 'animate-spin')} />
                   {status.label}
                 </Badge>

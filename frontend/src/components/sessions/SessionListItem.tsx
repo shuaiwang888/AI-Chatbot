@@ -139,10 +139,10 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
           </div>
         ) : (
           <>
-            <div className="truncate text-sm font-medium" title={title}>
+            <div className="line-clamp-2 break-words text-sm font-medium" title={title}>
               {title}
             </div>
-            <div className="mt-0.5 truncate text-xs text-muted-foreground">
+            <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
               {session.message_count} 条 · {formatRelativeTime(session.updated_at)}
             </div>
           </>
