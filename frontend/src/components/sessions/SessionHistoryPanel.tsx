@@ -33,6 +33,7 @@ export function SessionHistoryPanel() {
   const setSessionId = useChatStore((s) => s.setSessionId);
   const reset = useChatStore((s) => s.reset);
   const loadSessionMessages = useChatStore((s) => s.loadSessionMessages);
+  const setLoadingSession = useChatStore((s) => s.setLoadingSession);
 
   const sessionsQ = useSessions(50);
   const createMut = useCreateSession();
@@ -63,10 +64,12 @@ export function SessionHistoryPanel() {
       if (id === sessionId) return;
       // ⚡ 立即视觉反馈:
       // - 切 sessionId 让左栏标题更新
-      // - 清空 messages 让 MessageList 立刻显示 loading 状态
+      // - 清空 messages
+      // - 设 loadingSessionId → MessageList 立刻显示 "加载对话历史…"
       //   (而不是等到 1-3 秒后 fetch 完成才换)
       setSessionId(id);
       loadSessionMessages([]);
+      setLoadingSession(id);
 
       // ⚡ 主动 fetch + onSuccess 写 store (替代不可靠的 useEffect):
       // mutation 在 mutationKey 变化时不会重跑, 所以这里手动 cancel + reset,
@@ -79,11 +82,17 @@ export function SessionHistoryPanel() {
           const currentId = useChatStore.getState().sessionId;
           if (currentId === id) {
             loadSessionMessages(detail.messages);
+            // loadSessionMessages 内部会清 loadingSessionId
           }
+        },
+        onError: () => {
+          // 失败也要清掉, 不然 spinner 永远转
+          const currentId = useChatStore.getState().sessionId;
+          if (currentId === id) setLoadingSession(null);
         },
       });
     },
-    [sessionId, setSessionId, loadSessionMessages, selectMut],
+    [sessionId, setSessionId, loadSessionMessages, setLoadingSession, selectMut],
   );
 
   const sessions = useMemo(() => sortSessions(sessionsQ.data?.sessions), [sessionsQ.data]);

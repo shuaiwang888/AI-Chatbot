@@ -44,6 +44,11 @@ interface ChatState {
   messages: ChatMessage[];
   isStreaming: boolean;
   currentAssistantId: string | null;  // 正在流式的 assistant 消息 id
+  /** 正在 fetch 这个 session 的历史 (点击历史对话时设, onSuccess 清).
+   *  MessageList 用它判断是否显示 "加载对话历史…". null = 不显示.
+   *  关键: 新对话 handleNew 不设这个 flag → 永远显示欢迎页, 不会闪 loading.
+   */
+  loadingSessionId: string | null;
   error: string | null;
   // Show dev panels
   showAgentTrace: boolean;
@@ -52,6 +57,7 @@ interface ChatState {
   // actions
   setSessionId: (id: string) => void;
   loadSessionMessages: (msgs: SessionMessage[]) => void;
+  setLoadingSession: (id: string | null) => void;
   appendUser: (content: string) => string;       // 返回 message id
   startAssistant: () => string;                   // 返回 message id
   appendToken: (content: string) => void;
@@ -74,6 +80,7 @@ export const useChatStore = create<ChatState>()(
     messages: [],
     isStreaming: false,
     currentAssistantId: null,
+    loadingSessionId: null,
     error: null,
     showAgentTrace: false,
     showCitations: true,
@@ -81,10 +88,14 @@ export const useChatStore = create<ChatState>()(
     setSessionId: (id) => set({ sessionId: id }),
     // 不再 wipe messages; 由调用方显式调用 reset() / loadSessionMessages()
 
+    setLoadingSession: (id) => set({ loadingSessionId: id }),
+
     /** 从后端 SessionDetail.messages 加载历史到当前 store. 替换现有 messages.
      *
      * 关键 guard: 如果正在 streaming, 跳过 (避免切到旧 session 时把刚 send 的 user +
      * 空 assistant 覆盖). 调用方应在切换 session 前先 stop() 当前流.
+     *
+     * 同时清掉 loadingSessionId — fetch 完成, 不再显示 loading.
      */
     loadSessionMessages: (msgs) => {
       if (get().isStreaming) {
@@ -98,7 +109,7 @@ export const useChatStore = create<ChatState>()(
         content: m.content,
         createdAt: typeof m.created_at === 'number' ? m.created_at * 1000 : Date.now(),
       }));
-      set({ messages, error: null, isStreaming: false, currentAssistantId: null });
+      set({ messages, error: null, isStreaming: false, currentAssistantId: null, loadingSessionId: null });
     },
 
     appendUser: (content) => {
@@ -293,7 +304,7 @@ export const useChatStore = create<ChatState>()(
       }));
     },
 
-    reset: () => set({ messages: [], error: null, currentAssistantId: null, isStreaming: false }),
+    reset: () => set({ messages: [], error: null, currentAssistantId: null, isStreaming: false, loadingSessionId: null }),
     toggleAgentTrace: () => set((s) => ({ showAgentTrace: !s.showAgentTrace })),
     toggleCitations: () => set((s) => ({ showCitations: !s.showCitations })),
   })),

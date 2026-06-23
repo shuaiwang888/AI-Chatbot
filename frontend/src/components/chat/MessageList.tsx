@@ -13,7 +13,7 @@ import { useChatStore } from '@/stores/chatStore';
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
-  const sessionId = useChatStore((s) => s.sessionId);
+  const loadingSessionId = useChatStore((s) => s.loadingSessionId);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
 
   // 新消息自动滚到底
@@ -22,12 +22,11 @@ export function MessageList() {
   }, [messages.length]);
 
   if (messages.length === 0) {
-    // 区分两种空状态:
-    // - 没有 sessionId / 全新对话: 显示欢迎页 (引导用户提问)
-    // - 有 sessionId 但 messages=[] (点了历史对话, fetch 还没回来): 显示 loading
-    //   给用户"我正在切"的视觉反馈, 避免"点了没反应"
-    const isSwitching = !!sessionId;
-    if (isSwitching) {
+    // 区分两种空状态 (用 loadingSessionId 而非 sessionId 判断,
+    // 避免新对话 handleNew 把 sessionId 设成新 id 后误判为 "正在加载历史"):
+    // - loadingSessionId 有值: 点了历史对话, fetch 进行中 → 显示 spinner
+    // - loadingSessionId null: 全新对话 / 新建对话 → 显示欢迎页
+    if (loadingSessionId) {
       return (
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
