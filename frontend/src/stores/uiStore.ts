@@ -9,7 +9,7 @@ interface UIState {
   rightSidebarOpen: boolean; // 历史对话右栏
   theme: 'light' | 'dark' | 'system';
   showDocumentPanel: boolean;
-  /** Ferrofluid 流体背景开关. 默认 true, 顶栏可关闭以省 GPU / 提升性能. */
+  /** LightRays 光束背景开关. 默认 true, 顶栏可关闭以省 GPU / 提升性能. */
   showFluidBackground: boolean;
   // actions
   toggleSidebar: () => void;
