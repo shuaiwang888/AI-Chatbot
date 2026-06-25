@@ -2,7 +2,8 @@
  * 文档管理 hook (TanStack Query).
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { documentsApi } from '@/lib/api';
+import { toast } from 'sonner';
+import { documentsApi, ApiError } from '@/lib/api';
 import type { DocumentMeta } from '@/types';
 
 const KEY = ['documents'] as const;
@@ -50,6 +51,11 @@ export function useDeleteDocument() {
     mutationFn: (docId: string) => documentsApi.delete(docId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
+      toast.success('文档已删除');
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : String(err);
+      toast.error(`删除失败: ${msg}`);
     },
   });
 }

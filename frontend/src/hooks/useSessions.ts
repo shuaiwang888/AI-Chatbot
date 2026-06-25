@@ -2,7 +2,8 @@
  * 会话管理 hook (TanStack Query). 镜像 useDocuments.ts 模式.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { sessionsApi } from '@/lib/api';
+import { toast } from 'sonner';
+import { sessionsApi, ApiError } from '@/lib/api';
 import type { SessionDetail, SessionMeta } from '@/types';
 
 const KEY = ['sessions'] as const;
@@ -69,6 +70,11 @@ export function useDeleteSession() {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: KEY });
       qc.removeQueries({ queryKey: ['sessions', vars] });
+      toast.success('对话已删除');
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : String(err);
+      toast.error(`删除失败: ${msg}`);
     },
   });
 }

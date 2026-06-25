@@ -41,7 +41,7 @@ from app.services.chunking import (
 from app.services.embedding import get_embedder
 from app.services.parsers import parse_with_fallback
 from app.services.parsers.base_parser import ParsedDocument
-from app.services.persist import push_to_hf, schedule_push
+from app.services.persist import push_to_hf
 from app.services.vector_store import upsert_chunks
 
 logger = logging.getLogger(__name__)
@@ -304,34 +304,49 @@ async def _ingest_locked(content: bytes, filename: str) -> IngestResult:
 
 
 async def delete_document(doc_id: str) -> bool:
-    """完整删除: ChromaDB + 旁路 sparse + SQLite + uploads/."""
+    """完整删除: ChromaDB + 旁路 sparse + SQLite + uploads/ + HF Dataset.
+
+    删除顺序 (重要, 验证后定稿):
+    1) ChromaDB + sparse 旁路   — 失败立即抛错 (用户必须感知, 否则会复活)
+    2) SQLite metadata           — 失败抛错, 上传文件保留作 audit
+    3) uploads/ 原文件           — 失败仅 warn
+    4) 同步 push_to_hf()         — 阻塞 + verify, 配合 persist.py 的
+       delete_patterns 同步清远端
+
+    旧版顺序 (SQLite → ChromaDB) 有 UX bug: ChromaDB 删失败时只 warn,
+    但 SQLite 行已删, 前端 toast 仍说"已删除", 用户看到虚假成功. 下次
+    snapshot_download 把 chroma/ 拉回来, 文档"复活".
+    """
     # 先查, 拿文件路径
     doc = db.doc_get(doc_id)
     if doc is None:
         return False
 
-    # 从 ChromaDB / sparse 旁路删
-    try:
-        from app.services.vector_store import delete_by_doc
-        delete_by_doc(doc_id)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("ChromaDB delete failed for %s: %s", doc_id, e)
+    # 1) ChromaDB / sparse 旁路先删 (失败抛错, 阻止后续破坏性操作)
+    from app.services.vector_store import delete_by_doc
+    delete_by_doc(doc_id)
 
-    # SQLite chunks + document
+    # 2) SQLite chunks + document (失败抛错, 给用户感知)
     db.chunk_delete_by_doc(doc_id)
     db.doc_delete(doc_id)
 
-    # 删上传原文件
+    # 3) 删上传原文件 (失败仅 warn — 上传文件丢了不影响检索, GC 兜底)
     if doc.get("sha256"):
-        # doc_id 即子目录名
         up_dir = upload_dir() / doc_id
         if up_dir.exists():
             import shutil
             shutil.rmtree(up_dir, ignore_errors=True)
 
-    await schedule_push()
-    # ⚠️ 注意: delete 仍走 schedule_push (debounce), 不阻塞用户响应.
-    # 因为 delete 操作不产生新数据, 延迟 5s 推完全可接受.
+    # 4) 同步推 HF Dataset (A 改良版: 阻塞 + verify)
+    push_ok = await push_to_hf()
+    if not push_ok:
+        logger.warning(
+            "Delete ok locally but persist push failed for %s. "
+            "See /readyz persist.last_error. "
+            "Local data is gone but HF Dataset remote may still have ghost files "
+            "until next successful push or manual cleanup.",
+            doc_id,
+        )
     return True
 
 

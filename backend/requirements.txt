@@ -35,7 +35,7 @@ chromadb>=0.5,<2.0                # 1.0+ Rust core
 rank-bm25>=0.2.2                  # BM25 备用 (当前用 BGE-M3 稀疏通路, 留作降级)
 
 # ========== 持久化 ==========
-huggingface_hub>=0.30             # snapshot_download / upload_folder
+huggingface_hub>=0.30             # snapshot_download / upload_folder / delete_patterns (需 >=0.20)
 
 # ========== 分块 / NLP ==========
 tiktoken>=0.7                     # token 计数

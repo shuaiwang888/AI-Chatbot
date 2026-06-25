@@ -1,5 +1,6 @@
 import { HashRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
 import { TopBar } from '@/components/layout/TopBar';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { SessionHistoryPanel } from '@/components/sessions/SessionHistoryPanel';
@@ -29,6 +30,8 @@ export function App() {
             <SessionHistoryPanel />
           </div>
         </div>
+        {/* 全局 toast: 删除/上传/错误反馈. theme 跟项目深色主题配 */}
+        <Toaster theme="dark" position="bottom-right" richColors closeButton />
       </HashRouter>
     </QueryClientProvider>
   );

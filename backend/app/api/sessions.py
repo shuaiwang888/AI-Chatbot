@@ -12,6 +12,7 @@ from app.agents.graph import get_compiled_graph
 from app.agents.state import messages_to_lc
 from app.models import db
 from app.models.schemas import SessionCreate, SessionUpdate
+from app.services.persist import push_to_hf
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/sessions", tags=["sessions"])
@@ -66,16 +67,57 @@ async def update_session(session_id: str, body: SessionUpdate) -> dict:
 
 @router.delete("/{session_id}")
 async def delete_session(session_id: str) -> dict:
-    """删除会话. SQLite + LangGraph checkpoint 一并清."""
-    db.session_delete(session_id)
-    # LangGraph checkpoint 删: 用其内部 API
+    """删除会话. SQLite + LangGraph checkpoint + HF Dataset 一并清.
+
+    删除顺序 (重要):
+    1) 先删 LangGraph checkpoint — 失败抛 500, session 行保留 (用户能重试)
+    2) 再删 SQLite session 行 (FK CASCADE 自动删 messages)
+    3) 最后 await push_to_hf() 同步推 HF Dataset, 配合 persist.py 的
+       delete_patterns, 让远端 sqlite/langgraph.db 同步清理.
+       用同步 push (非 schedule_push debounce) 因为:
+       - 与 ingestion.delete_document 保持一致
+       - 用户已点删除, 期望"彻底消失", 5s 窗口期崩了会留幽灵
+       - session 体积小 (langgraph.db 单文件), push 比 doc 快很多
+
+    历史坑:
+    - 旧版先 db.session_delete 后 adelete_thread, checkpoint 失败时
+      元数据已删, checkpoint 还在 → "删了但聊天记录还在"
+    - 旧版没 schedule_push, 远端 sqlite 永远不更新 → 下次冷启动又冒出来
+    - 旧版用 schedule_push debounce, 5s 内崩了 + 远端残留
+    """
+    # 1) LangGraph checkpoint 先删 (失败抛错, 不进下一步)
     try:
         graph = await get_compiled_graph()
         checkpointer = graph.checkpointer  # AsyncSqliteSaver
         if hasattr(checkpointer, "adelete_thread"):
             await checkpointer.adelete_thread(session_id)
+        else:
+            # 显式拒绝, 避免静默跳过
+            raise RuntimeError(
+                "Checkpointer does not support adelete_thread; "
+                "langgraph version may be too old."
+            )
     except Exception as e:  # noqa: BLE001
-        logger.warning("LangGraph checkpoint delete failed for %s: %s", session_id, e)
+        logger.exception("LangGraph checkpoint delete failed for %s", session_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Checkpoint delete failed: {e}",
+        ) from e
+
+    # 2) SQLite session 行 (FK CASCADE 自动删 messages)
+    db.session_delete(session_id)
+
+    # 3) 同步推 HF Dataset (与 ingestion.delete_document 保持一致)
+    push_ok = await push_to_hf()
+    if not push_ok:
+        logger.warning(
+            "Delete ok locally but persist push failed for session %s. "
+            "See /readyz persist.last_error. "
+            "Local data is gone but HF Dataset remote may still have ghost files "
+            "until next successful push or manual cleanup.",
+            session_id,
+        )
+
     return {"session_id": session_id, "deleted": True}
 
 
