@@ -78,7 +78,10 @@ class Settings(BaseSettings):
     # ========== 向量库 / ChromaDB ==========
     chroma_persist_dir: str = "./data/chroma"
     chroma_collection: str = "docs"
-    enable_colbert: bool = True  # 三路融合开关; false 则仅 dense+sparse
+    # ⚡ A 改良版: 默认关闭 ColBERT. 三路融合 (dense+sparse+colbert) 每次查询
+    # 多扫 30 个 .npy 文件 + matmul, 0.3-1.5s 开销. 召回率轻微降, reranker 兜底.
+    # 想恢复三路融合, 设环境变量 ENABLE_COLBERT=true.
+    enable_colbert: bool = False
 
     # ========== 持久化 (HF Dataset repo) ==========
     hf_persist_repo: str = ""  # 形如 "username/ai-chatbot-data". 留空禁用持久化

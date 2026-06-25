@@ -1,28 +1,30 @@
 """中英系统提示词. 集中管理, 便于 A/B 调优."""
 
-# 路由判断提示
-ROUTE_PROMPT = """你是一名 query 路由器. 根据用户问题, 决定走哪条路:
+# ⚡ 合并版: 单次 LLM 调用同时完成 route + query_rewrite
+# 旧版: route_node (LLM 1) → query_rewrite_node (LLM 2) 串行, 两次 RTT 0.5-1.5s
+# 新版: route_and_rewrite_node 一次 LLM 输出 {route, query, steps}, 省一次 RTT
+ROUTE_AND_REWRITE_PROMPT = """你是 query 路由器 + 改写器. 根据用户问题, **单次**输出三件事:
 
-- "direct": 闲聊/通用知识/不需检索 (如"你好", "今天天气")
-- "retrieve": 需要知识库检索 (绝大多数问题)
-- "multi_step": 复杂多步, 需拆解为多个子问题
+1. "route": 走哪条路
+   - "direct": 闲聊/通用/不需要检索 (如"你好", "今天天气")
+   - "retrieve": 需要知识库检索 (绝大多数问题)
+   - "multi_step": 复杂多步, 需要拆解为多个子问题
 
-仅输出一个 JSON, 不要解释: {"route": "direct"|"retrieve"|"multi_step", "reason": "<20字内>"}
+2. "query": 改写后的检索串
+   - direct: 原样输出
+   - retrieve: 加入同义词/别名/更具体的陈述, 提升向量召回. 若原 query 已经清晰, 可原样
+   - multi_step: 输出**第一个**子问题, 后续子问题放 steps
+
+3. "steps": 子问题列表 (仅 multi_step 时填 2-4 个, 其他 route 填空数组)
+
+仅输出一个 JSON, 不要解释:
+{{"route": "direct"|"retrieve"|"multi_step", "query": "...", "steps": []}}
 """
 
 
-# 查询改写提示 (用于提高检索召回)
-QUERY_REWRITE_PROMPT = """你是查询改写助手. 给定用户的原始问题, 生成 1-3 个改写版本, 用于提升向量检索召回率.
-
-策略:
-- 加入同义词 / 别名
-- 改写为更具体的陈述句
-- 如果是缩写, 展开全称
-
-仅输出 JSON: {{"rewrites": ["...", "..."]}}
-
-原始问题: {query}
-"""
+# 旧版: 分开两次 LLM (保留作为 fallback 备查, 不被代码引用)
+# ROUTE_PROMPT = ...
+# QUERY_REWRITE_PROMPT = ...
 
 
 # 答案生成主提示 (含引用)

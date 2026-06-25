@@ -1,9 +1,13 @@
 /**
  * 单条消息气泡. user 右对齐灰底, assistant 左对齐无背景.
  * assistant content 用 react-markdown 渲染 (GFM: 表格/任务列表/代码块等).
+ *
+ * ⚡ A 改良版: 用 React.memo 包裹, 配合 Virtuoso computeItemKey.
+ * 流式时, 父组件 re-render 不再让所有历史 bubble 跟着重渲染,
+ * 只重渲当前 streaming 那个 (props 引用变化的那个).
  */
 import { Bot, User } from 'lucide-react';
-import { useMemo } from 'react';
+import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -16,7 +20,7 @@ function stripThink(s: string): string {
   return s.replace(/<think>[\s\S]*?<\/think>/g, '').trim();
 }
 
-export function MessageBubble({ message }: { message: ChatMessage }) {
+function MessageBubbleInner({ message }: { message: ChatMessage }) {
   const isUser = message.role === 'user';
   // 实时剥离 <think> 块, 再交给 markdown 渲染
   const visibleText = useMemo(
@@ -71,3 +75,10 @@ export function MessageBubble({ message }: { message: ChatMessage }) {
     </div>
   );
 }
+
+/**
+ * ⚡ React.memo: 默认浅比较 props.
+ * 流式时父组件 messages 数组每次都新建, 但非流消息的 props 引用未变,
+ * → memo 阻止重渲. 仅当本条 message 引用变化时才重渲.
+ */
+export const MessageBubble = memo(MessageBubbleInner);

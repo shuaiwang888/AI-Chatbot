@@ -1,8 +1,11 @@
 """LangGraph StateGraph 装配 + 编译.
 
-设计: 图只负责"检索循环" (route → query_rewrite → retrieve → rerank → evaluate).
+设计: 图只负责"检索循环" (route → retrieve → rerank → evaluate).
 answer 流式生成由 chat 端点直接驱动 (answer_node_stream + asyncio.Queue),
 这样 SSE token 流不依赖 astream_events 的复杂性.
+
+⚡ A 改良版: route + query_rewrite 已合并为单次 LLM 调用 (route_node),
+旧版两次串行 RTT → 一次, 省 0.5-1.5s.
 
 流程图:
 
@@ -12,14 +15,14 @@ answer 流式生成由 chat 端点直接驱动 (answer_node_stream + asyncio.Que
    route ─── direct ───────────────────────────────► END
       │
       ▼
-   query_rewrite ──► retrieve ──► rerank ──► evaluate
-                                                   │
-                       ┌──── (needs_more, iter<max) ───┐
-                       │                              │
-                       └──── (relevant/irrelevant/max) ┘
-                              │
-                              ▼
-                             END
+   retrieve ──► rerank ──► evaluate
+                                   │
+              ┌──── (needs_more, iter<max) ───┐
+              │                              │
+              └──── (relevant/irrelevant/max) ┘
+                     │
+                     ▼
+                    END
 """
 from __future__ import annotations
 
@@ -30,7 +33,6 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agents.nodes import (
     evaluate_node,
-    query_rewrite_node,
     rerank_node,
     retrieve_node,
     route_node,
@@ -46,13 +48,13 @@ def _after_route(state: AgentState) -> str:
     decision = state.get("route_decision", "retrieve")
     if decision == "direct":
         return END
-    return "query_rewrite"
+    return "retrieve"
 
 
 def _after_evaluate(state: AgentState) -> str:
     """evaluate 后: needs_more + iter<max -> 回 retrieve; 否则 END."""
     if state.get("needs_more_retrieval", False):
-        return "query_rewrite"
+        return "retrieve"
     return END
 
 
@@ -61,7 +63,6 @@ def _build_graph() -> StateGraph:
     g = StateGraph(AgentState)
 
     g.add_node("route", route_node)
-    g.add_node("query_rewrite", query_rewrite_node)
     g.add_node("retrieve", retrieve_node)
     g.add_node("rerank", rerank_node)
     g.add_node("evaluate", evaluate_node)
@@ -69,14 +70,13 @@ def _build_graph() -> StateGraph:
     g.add_edge(START, "route")
     g.add_conditional_edges(
         "route", _after_route,
-        {END: END, "query_rewrite": "query_rewrite"},
+        {END: END, "retrieve": "retrieve"},
     )
-    g.add_edge("query_rewrite", "retrieve")
     g.add_edge("retrieve", "rerank")
     g.add_edge("rerank", "evaluate")
     g.add_conditional_edges(
         "evaluate", _after_evaluate,
-        {END: END, "query_rewrite": "query_rewrite"},
+        {END: END, "retrieve": "retrieve"},
     )
 
     return g

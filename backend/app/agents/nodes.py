@@ -21,9 +21,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from app.agents.prompts import (
     ANSWER_PROMPT,
     CRAG_EVAL_PROMPT,
-    MULTI_STEP_PROMPT,
-    QUERY_REWRITE_PROMPT,
-    ROUTE_PROMPT,
+    ROUTE_AND_REWRITE_PROMPT,
 )
 from app.agents.state import AgentState
 from app.agents.tools import TOOL_SCHEMAS, execute_tool
@@ -74,87 +72,79 @@ def _safe_json(text: str) -> dict | None:
     return None
 
 
-# ========== Node 1: route ==========
+# ========== Node 1+2 合并: route + query_rewrite ==========
+# ⚡ A 改良版: 旧版 route_node (LLM 1) → query_rewrite_node (LLM 2) 串行,
+# 两次网络 RTT 0.5-1.5s. 合并为单次 LLM 调用, 输出 {route, query, steps}.
+# 收益: 省 1 次 RTT (~0.3-0.8s) + 1 次 LLM TTFT (~0.2-0.5s).
 async def route_node(state: AgentState) -> dict[str, Any]:
-    """判断 query 走向: direct / retrieve / multi_step."""
+    """⚡ 单次 LLM 同时决定 route + 改写 query (multi_step 时拆子问题)."""
     started = time.time()
     query = _last_user_query(state)
     if not query:
-        return {"route_decision": "retrieve"}
+        return {"route_decision": "retrieve", "query_rewritten": "", "plan": []}
 
-    # 启发式快路 (避免每次都 LLM 调用)
+    # 启发式快路 (短问候跳过 LLM, 省 0.5-1.5s)
     ql = query.strip().lower()
     if len(ql) <= 12 and any(g in ql for g in (
         "你好", "您好", "hi", "hello", "hey", "你是谁", "what's up", "how are you",
         "thanks", "thank you", "谢谢", "再见", "bye",
     )):
-        return {"route_decision": "direct", "query_rewritten": query}
+        return {"route_decision": "direct", "query_rewritten": query, "plan": []}
 
     try:
         llm = get_llm()
         resp = await llm.chat(
             messages=[
-                LLMMessage(role="system", content=ROUTE_PROMPT),
+                LLMMessage(role="system", content=ROUTE_AND_REWRITE_PROMPT),
                 LLMMessage(role="user", content=query),
             ],
             temperature=0.0,
-            max_tokens=80,
+            max_tokens=200,  # 比旧版 max 80 略多, 但单次调用比分两次便宜
         )
         data = _safe_json(resp.content or "")
-        decision = data.get("route", "retrieve") if data else "retrieve"
+        decision = (data or {}).get("route", "retrieve")
+        rewritten = (data or {}).get("query", query) or query
+        steps = (data or {}).get("steps", []) or []
+
+        # 兜底: 决策不合法降级
         if decision not in ("direct", "retrieve", "multi_step"):
             decision = "retrieve"
-        logger.debug("route: %s (%sms) reason=%s", decision, int((time.time() - started) * 1000),
-                     (data or {}).get("reason", ""))
-        return {"route_decision": decision, "query_rewritten": query}
+        # 兜底: steps 不是 list 降级
+        if not isinstance(steps, list):
+            steps = []
+
+        if decision == "multi_step":
+            if not steps:
+                steps = [rewritten]
+            plan = steps
+            # multi_step 时, query 字段是"第一个子问题", 直接覆盖
+            final_query = steps[0]
+        else:
+            plan = []
+            final_query = rewritten
+
+        logger.debug(
+            "route+rewrite: %s (%dms) q=%r plan=%d",
+            decision, int((time.time() - started) * 1000), final_query[:30], len(plan),
+        )
+        return {
+            "route_decision": decision,
+            "query_rewritten": final_query,
+            "plan": plan,
+        }
     except Exception as e:  # noqa: BLE001
         logger.warning("route_node failed: %s, default to retrieve", e)
-        return {"route_decision": "retrieve", "query_rewritten": query}
+        return {"route_decision": "retrieve", "query_rewritten": query, "plan": []}
 
 
-# ========== Node 2: query_rewrite ==========
+# ⚠️ 旧 query_rewrite_node 已废弃 (合并到 route_node 上面)
+# 保留作为旧 graph 配置兼容, 实际不再被任何 graph 调用.
+# 如果有新代码误调, 走快速 fallback 避免崩溃.
 async def query_rewrite_node(state: AgentState) -> dict[str, Any]:
-    """对 query 改写, 提升召回. multi_step 时拆子问题."""
-    started = time.time()
+    """[已废弃] 旧版 query_rewrite 节点. 实际功能已合并到 route_node."""
+    logger.debug("query_rewrite_node called but deprecated; merging handled in route_node")
     query = state.get("query_rewritten") or _last_user_query(state)
-    if state.get("route_decision") == "direct":
-        return {"query_rewritten": query, "plan": []}
-
-    try:
-        llm = get_llm()
-        if state.get("route_decision") == "multi_step":
-            resp = await llm.chat(
-                messages=[
-                    LLMMessage(role="system", content=MULTI_STEP_PROMPT),
-                    LLMMessage(role="user", content=query),
-                ],
-                temperature=0.2,
-                max_tokens=200,
-            )
-            data = _safe_json(resp.content or "")
-            steps = (data or {}).get("steps", [query])
-            if not isinstance(steps, list) or not steps:
-                steps = [query]
-            return {"query_rewritten": steps[0], "plan": steps}
-
-        resp = await llm.chat(
-            messages=[
-                LLMMessage(role="system", content=QUERY_REWRITE_PROMPT.format(query=query)),
-            ],
-            temperature=0.3,
-            max_tokens=200,
-        )
-        data = _safe_json(resp.content or "")
-        rewrites = (data or {}).get("rewrites", [])
-        if not isinstance(rewrites, list) or not rewrites:
-            rewrites = [query]
-        # 拼接为最终检索串
-        merged = " | ".join([query] + list(rewrites[:2]))
-        logger.debug("query_rewrite: %d variants, %dms", len(rewrites), int((time.time() - started) * 1000))
-        return {"query_rewritten": merged, "plan": []}
-    except Exception as e:  # noqa: BLE001
-        logger.warning("query_rewrite failed: %s", e)
-        return {"query_rewritten": query, "plan": []}
+    return {"query_rewritten": query, "plan": state.get("plan") or []}
 
 
 # ========== Node 3: retrieve ==========

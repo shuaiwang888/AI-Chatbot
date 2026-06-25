@@ -31,6 +31,7 @@ from app.llm.base import LLMMessage
 from app.llm.factory import get_llm
 from app.models import db
 from app.models.schemas import ChatRequest, ChatResponse
+from app.services.persist import schedule_push
 from app.streaming.events import (
     sse_done,
     sse_error,
@@ -49,6 +50,9 @@ from app.streaming.events import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+# 持引用防 GC: 后台算 title 的任务可能跑 1-2s, 中间被 GC 会丢更新
+_deferred_tasks: set[asyncio.Task] = set()
 
 
 # ========== 兜底: 阶段 1 简单直答 (route=direct / 无 agent) ==========
@@ -168,13 +172,30 @@ async def _run_agent(
     state["messages"] = history_msgs
 
     # 4. 记录 user message 到 SQLite
-    #    - 若 session 还没有 title 且这是首条 user 消息, 自动从前 30 字生成
+    #    - user message 同步写 (审计需要, 不能丢)
+    #    - session 已有 title → 直接 upsert
+    #    - session 还没有 title → 用 asyncio.create_task 后台算, 不阻塞首字
+    #      (注: 实际 _auto_title 是字符串截断, 不是 LLM, 收益微小; 但作为
+    #       防御性编程, 把所有非关键路径工作都移出 hot path)
     existing = db.session_get(req.session_id)
-    auto_title = None
-    if existing is None or not existing.get("title"):
-        from app.api.sessions import _auto_title
-        auto_title = _auto_title(req.message)
-    db.session_upsert(req.session_id, title=auto_title)
+    if existing is not None and existing.get("title"):
+        db.session_upsert(req.session_id, title=None)  # 仅 updated_at 刷新
+    else:
+        # 首次消息: 先空 title 写一行占位, 后台异步算 title 后再 upsert 更新
+        db.session_upsert(req.session_id, title=None)
+
+        async def _deferred_title() -> None:
+            try:
+                from app.api.sessions import _auto_title
+                title = _auto_title(req.message)
+                db.session_upsert(req.session_id, title=title)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("Deferred auto_title failed: %s", e)
+
+        # 持引用防 GC
+        task = asyncio.create_task(_deferred_title())
+        _deferred_tasks.add(task)
+        task.add_done_callback(_deferred_tasks.discard)
     db.message_insert({
         "id": uuid.uuid4().hex,
         "session_id": req.session_id,
@@ -243,5 +264,13 @@ async def _run_agent(
         "content": final_state.get("final_answer", ""),
         "citations": final_state.get("citations", []),
     })
+
+    # 9. ⚠️ 关键: 把 session/message 写完 → 调度 persist push (5s debounce).
+    #    不调的话: 写本地 /data/sqlite/app.db → Space 重启 /data 临时卷清空 →
+    #    历史对话全丢. 5s debounce 够合并同一 session 的 user+assistant 写入.
+    try:
+        await schedule_push()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("schedule_push after chat failed: %s", e)
 
     return final_state, events_log

@@ -58,6 +58,10 @@ export function MessageList() {
       data={messages}
       className="h-full"
       followOutput="smooth"
+      // ⚡ A 改良版: computeItemKey 让 Virtuoso 用稳定 id 跟踪 row,
+      // 避免默认按 index 重建所有已渲染 row 引用 → 配合 MessageBubble 的
+      // React.memo, 流式时只有当前那条重渲, 历史 bubble 全部跳过.
+      computeItemKey={(_, msg) => msg.id}
       itemContent={(_, msg) => (
         <div className="mx-auto max-w-3xl space-y-3 px-4 py-3">
           {msg.role !== 'user' && (msg.thinking || msg.agentSteps?.length || msg.retrieval) && (
