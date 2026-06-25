@@ -59,19 +59,46 @@ export function SessionHistoryPanel() {
     });
   }, [queryClient, reset, loadSessionMessages, setSessionId, createMut]);
 
-  // ⚡ 自动新建对话 (首次打开 / 刷新页面):
-  // 修复前 ChatArea 用 localStorage fallback, 刷新 = 自动恢复上次对话.
-  // 用户期望"首次打开应该是新建对话" → 这里 store 空就触发 handleNew 一次.
+  // ⚡ 自动进入对话 (首次打开 / 刷新页面):
+  //
+  // 行为:
+  // 1. store.sessionId 已经有 → 啥都不做 (用户手动点过 history)
+  // 2. 后端 sessions 列表已加载:
+  //    a. 列表最新一条是空 session (message_count == 0) → 重用它
+  //       (避免刷新页面就堆一堆 "Untitled chat")
+  //    b. 列表最新一条有内容 (message_count > 0) → 新建一个空 session
+  //    c. 列表为空 → 新建一个空 session
+  // 3. 后端 sessions 还在 loading → 等加载完再决定 (effect 重跑)
+  //
   // 用 ref 防 React 18 strict mode 双重 mount 导致的两次 create.
   const autoCreatedRef = useRef(false);
   useEffect(() => {
     if (autoCreatedRef.current) return;
     if (sessionId) return;            // 已有 session, 不动
     if (createMut.isPending) return;  // 已经在建, 等它完成
+
+    // 还在加载 sessions 列表 → 等
+    if (sessionsQ.isLoading) return;
+    // 加载失败 (后端离线) → 也新建, 让用户至少能跟 LLM 聊 (虽然没 history)
+    // 这里不 return, 直接走 handleNew
+
+    const list = sortSessions(sessionsQ.data?.sessions);
+    const newest = list[0];
+
     autoCreatedRef.current = true;
+
+    if (newest && newest.message_count === 0) {
+      // 重用最新的空 session (它本来就是上次刷新时"自动新建"留下的,
+      // 用户大概率还没开始打字). 同样清 messages + 设 active.
+      setSessionId(newest.id);
+      loadSessionMessages([]);
+      return;
+    }
+
+    // 列表里没有空 session (要么空列表, 要么最新一条已经有消息) → 新建
     handleNew();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [sessionsQ.isLoading, sessionsQ.data, sessionId, createMut.isPending]);
 
   const handleSelect = useCallback(
     (id: string) => {
