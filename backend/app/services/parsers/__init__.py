@@ -35,6 +35,9 @@ def _register_default() -> None:
         _REGISTRY["simple"] = SimpleParser
     except ImportError as e:
         logger.warning("simple parser not installed: %s", e)
+    # Markdown parser — 零依赖, 始终可用
+    from app.services.parsers.markdown_parser import MarkdownParser
+    _REGISTRY["markdown"] = MarkdownParser
     # mineru / vlm 留 hook (按需装)
 
 
@@ -55,7 +58,13 @@ def get_parser(name: str | None = None) -> BaseParser:
 
 
 def get_parser_chain() -> list[BaseParser]:
-    """按 settings 配置返回 [primary, fallback] 链."""
+    """按 settings 配置返回 [primary, fallback] 链.
+
+    此外, 始终把零依赖的 markdown parser 追加到链尾 — 它支持的扩展名
+    (md/markdown) 跟 primary/fallback 都不重叠, 互不干扰. 这样
+    PARSER_PRIMARY=docling + PARSER_FALLBACK=simple 的生产配置, 用户
+    上传 .md 文件也能直接被 markdown parser 接管, 不需要改 env.
+    """
     chain: list[BaseParser] = []
     for name in (settings.parser_primary, settings.parser_fallback):
         if name and name not in {p.name for p in chain}:
@@ -64,6 +73,12 @@ def get_parser_chain() -> list[BaseParser]:
             except IngestionFailedError:
                 # 跳过未装的, 继续
                 continue
+    # 始终补一个 markdown parser (零依赖, 必装), 除非已存在于链
+    if "markdown" not in {p.name for p in chain}:
+        try:
+            chain.append(_build_parser("markdown"))
+        except IngestionFailedError:
+            pass
     return chain
 
 

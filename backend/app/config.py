@@ -104,8 +104,8 @@ class Settings(BaseSettings):
     llm_cache_size: int = 200
 
     # ========== 解析器 ==========
-    parser_primary: Literal["docling", "marker", "mineru", "vlm"] = "docling"
-    parser_fallback: Literal["docling", "marker", "mineru", "vlm"] = "marker"
+    parser_primary: Literal["docling", "marker", "mineru", "vlm", "simple", "markdown"] = "docling"
+    parser_fallback: Literal["docling", "marker", "mineru", "vlm", "simple", "markdown"] = "marker"
     parser_enable_ocr: bool = True
     parser_table_structure: bool = True
 

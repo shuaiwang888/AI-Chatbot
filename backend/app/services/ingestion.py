@@ -41,7 +41,7 @@ from app.services.chunking import (
 from app.services.embedding import get_embedder
 from app.services.parsers import parse_with_fallback
 from app.services.parsers.base_parser import ParsedDocument
-from app.services.persist import schedule_push
+from app.services.persist import push_to_hf, schedule_push
 from app.services.vector_store import upsert_chunks
 
 logger = logging.getLogger(__name__)
@@ -90,6 +90,8 @@ def _sniff_mime(filename: str, head: bytes) -> str:
         ".jpeg": "image/jpeg",
         ".tiff": "image/tiff",
         ".html": "text/html",
+        ".md": "text/markdown",
+        ".markdown": "text/markdown",
     }.get(ext, "application/octet-stream")
 
 
@@ -261,8 +263,18 @@ async def _ingest_locked(content: bytes, filename: str) -> IngestResult:
             filename, doc_id, len(chunking.children), elapsed_ms,
         )
 
-        # 11. 调度持久化推送
-        await schedule_push()
+        # 11. ✅ A 改良版: 重要写操作 (upload) 同步阻塞 push, 不再吃 debounce 黑洞
+        # 用户已经等了 1-3 分钟摄入, 再加 5-15s push 可接受
+        # push 内部已带 verify, 失败会写 _state['last_error'] 让 /readyz 暴露
+        push_ok = await push_to_hf()
+        if not push_ok:
+            # push 失败但不阻塞 ingest 结果 (用户至少能看到 doc ready)
+            logger.warning(
+                "Ingest done but persist push failed for %s. "
+                "See /readyz persist.last_error. "
+                "Data is still on local /data but may not survive Space restart.",
+                doc_id,
+            )
 
         return IngestResult(
             doc_id=doc_id,
@@ -308,6 +320,8 @@ async def delete_document(doc_id: str) -> bool:
             shutil.rmtree(up_dir, ignore_errors=True)
 
     await schedule_push()
+    # ⚠️ 注意: delete 仍走 schedule_push (debounce), 不阻塞用户响应.
+    # 因为 delete 操作不产生新数据, 延迟 5s 推完全可接受.
     return True
 
 

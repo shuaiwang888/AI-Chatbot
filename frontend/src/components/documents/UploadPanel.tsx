@@ -21,7 +21,7 @@ export function UploadPanel() {
   const handleFile = useCallback(
     async (file: File) => {
       // 客户端预检
-      const ALLOWED = ['.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg', '.tiff', '.html'];
+      const ALLOWED = ['.pdf', '.docx', '.pptx', '.xlsx', '.png', '.jpg', '.jpeg', '.tiff', '.html', '.md', '.markdown'];
       const ext = '.' + (file.name.split('.').pop() || '').toLowerCase();
       if (!ALLOWED.includes(ext)) {
         setLastResult({ filename: file.name, status: 'failed', error: `不支持的格式: ${ext}` });
@@ -96,7 +96,7 @@ export function UploadPanel() {
           ref={inputRef}
           type="file"
           className="hidden"
-          accept=".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.tiff,.html"
+          accept=".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.tiff,.html,.md,.markdown"
           multiple
           onChange={(e) => {
             const files = Array.from(e.target.files || []);
@@ -105,7 +105,7 @@ export function UploadPanel() {
           }}
         />
         <p className="mt-2 text-[10px] text-muted-foreground">
-          PDF / Word / PPT / Excel / 图片, ≤ 50MB
+          PDF / Word / PPT / Excel / Markdown / 图片, ≤ 50MB
         </p>
       </div>
 
