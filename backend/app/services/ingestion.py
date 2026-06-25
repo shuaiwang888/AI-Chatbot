@@ -284,6 +284,16 @@ async def _ingest_locked(content: bytes, filename: str) -> IngestResult:
 
     except Exception as e:  # noqa: BLE001
         logger.exception("Ingest failed for %s", filename)
+        # ⚡ 清理孤儿文件: 解析/分块/向量化失败时, /data/uploads/{doc_id}/{filename}
+        # 已经写盘. 不删的话会:
+        # 1) 后续 ingest_failed 累加, 浪费磁盘
+        # 2) 触发 persist 推送时 "is not a file" 错误 (因为路径解析异常)
+        # 注意: SHA256 已存在 (走 duplicate 分支) 的不进来这里, 已经 unlink 过了.
+        try:
+            file_path.unlink(missing_ok=True)
+        except Exception as cleanup_err:  # noqa: BLE001
+            logger.warning("Failed to cleanup orphan file %s: %s", file_path, cleanup_err)
+        # 标记 SQLite 行失败 (保留审计轨迹, 方便排查), 不删 row
         try:
             db.doc_update_status(doc_id, "failed", error=str(e)[:500])
         except Exception:  # noqa: BLE001
