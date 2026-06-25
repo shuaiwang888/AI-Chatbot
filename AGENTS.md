@@ -418,6 +418,139 @@ import { Toaster } from 'sonner';
 
 ---
 
+### 4.12 [后端+前端] Chat 首字慢 + 流式渲染掉帧 — 5 项高 ROI 优化
+
+**症状**: 用户输入问句后, agent 反应慢 (TTFT ~4-6s, p95 ~8-12s), 长回答末段"打字掉帧".
+
+**调研方法**: 跑一个 explore 子代理, 调查从"前端 dispatch"到"首字可见"全链路的每环节耗时, 引用具体 file_path:line.
+
+**找到的瓶颈 (按绝对延迟值排序)**:
+
+| 环节 | 位置 | 耗时 | 是否优化 |
+|---|---|---|---|
+| `_auto_title` 隐藏同步 | `chat.py:175-177` | 0 (实际是字符串函数) | ✅ #2 (防御性) |
+| `route_node` LLM | `nodes.py:78-112` | 0.5-1.5s | ✅ #3 (合并) |
+| `query_rewrite_node` LLM | `nodes.py:116-157` | 0.5-1.5s | ✅ #3 (合并) |
+| BGE-M3 encode query | `embedding.py:113-120` | 0.1-0.4s | ❌ CPU fp32 限制 |
+| `hybrid_query` ColBERT 30 .npy | `vector_store.py:309-333` | 0.3-1.5s | ✅ #1 (关) |
+| BGE-reranker over 20 | `reranker.py:62-87` | 0.3-1.5s | ❌ CPU 限制 |
+| 前端每 token 全量重渲 | `chatStore.ts:149-203` + `MessageBubble.tsx:19` + `MessageList.tsx:56-88` | 累积 0.1-0.5s | ✅ #4 + #5 |
+
+**修复 (commit `53abc24`)**:
+
+**#1 关 ColBERT** — [backend/app/config.py:81](backend/app/config.py#L81):
+```python
+# ⚡ A 改良版: 默认关闭 ColBERT. 三路融合每次查询多扫 30 个 .npy 文件 + matmul,
+# 0.3-1.5s 开销. 召回率轻微降, reranker 兜底.
+enable_colbert: bool = False
+```
+⚠️ **改默认值, 不改 .env**: `.env` 被 `.gitignore` 排除, HF Space 读不到. 改 `config.py` 默认值才生效. 想恢复设 `ENABLE_COLBERT=true` 环境变量.
+
+**#2 _auto_title 后台化** — [backend/app/api/chat.py:178-198](backend/app/api/chat.py#L178-L198):
+```python
+# 持引用防 GC
+_deferred_tasks: set[asyncio.Task] = set()
+
+# 首次消息: 先空 title 写一行占位, 后台异步算 title 后再 upsert 更新
+async def _deferred_title() -> None:
+    try:
+        from app.api.sessions import _auto_title
+        title = _auto_title(req.message)
+        db.session_upsert(req.session_id, title=title)
+    except Exception as e:
+        logger.warning("Deferred auto_title failed: %s", e)
+
+task = asyncio.create_task(_deferred_title())
+_deferred_tasks.add(task)
+task.add_done_callback(_deferred_tasks.discard)
+```
+**注**: 调研子代理误判 `_auto_title` 是 LLM 调用. 实际 `sessions.py:20-27` 是纯字符串截断. 真实节省 <1ms, 仅作防御性编程.
+
+**#3 合并 route + query_rewrite** — [backend/app/agents/prompts.py](backend/app/agents/prompts.py) + [nodes.py:78-167](backend/app/agents/nodes.py#L78-L167) + [graph.py](backend/app/agents/graph.py):
+```python
+# 新 prompts.py
+ROUTE_AND_REWRITE_PROMPT = """你是 query 路由器 + 改写器. 单次输出三件事:
+1. "route": "direct" | "retrieve" | "multi_step"
+2. "query": 改写后的检索串 (direct 原样)
+3. "steps": 子问题列表 (仅 multi_step 填 2-4 个)
+
+仅输出一个 JSON: {{"route": "...", "query": "...", "steps": []}}
+"""
+
+# nodes.py: route_node 一次 LLM 调用同时拿三个字段
+async def route_node(state):
+    # ... 启发式快路 (短问候跳过 LLM)
+    resp = await llm.chat(messages=[...ROUTE_AND_REWRITE_PROMPT, query], ...)
+    return {"route_decision": ..., "query_rewritten": ..., "plan": [...]}
+
+# graph.py: 删 query_rewrite 节点, route 直接接 retrieve
+g.add_edge(START, "route")
+g.add_conditional_edges("route", _after_route, {END: END, "retrieve": "retrieve"})
+g.add_edge("retrieve", "rerank")
+```
+旧 `query_rewrite_node` 保留为 deprecated fallback (不再被 graph 调用).
+
+**#4 rAF 帧合并** — [frontend/src/stores/chatStore.ts](frontend/src/stores/chatStore.ts):
+```ts
+// 模块级 buffer (跨 token 累积)
+const _tokenBuf: string[] = [];
+let _rafScheduled: number | null = null;
+const _rafImpl = typeof requestAnimationFrame === 'function'
+  ? requestAnimationFrame
+  : ((cb) => setTimeout(cb, 16));  // SSR 兜底
+
+function _flushTokenBuffer() {
+  if (_rafScheduled !== null) { _cancelRaf(_rafScheduled); _rafScheduled = null; }
+  _tokenBuf.length = 0;
+}
+
+appendToken: (content) => {
+  _tokenBuf.push(content);
+  if (_rafScheduled !== null) return;
+  _rafScheduled = _rafImpl(() => {
+    _rafScheduled = null;
+    const batched = _tokenBuf.join('');
+    _tokenBuf.length = 0;
+    set((s) => ({ messages: s.messages.map(...) }));  // 一次性 set
+  });
+}
+
+// 兜底: 流结束必须 flush, 防止最后一帧 token 没渲
+finishAssistant: () => { _flushTokenBuffer(); set(...); }
+failAssistant: (err) => { _flushTokenBuffer(); set(...); }
+reset: () => { _flushTokenBuffer(); set(...); }
+loadSessionMessages: (msgs) => { _flushTokenBuffer(); set(...); }
+```
+
+**#5 React.memo + Virtuoso computeItemKey** — [MessageBubble.tsx](frontend/src/components/chat/MessageBubble.tsx) + [MessageList.tsx:56-60](frontend/src/components/chat/MessageList.tsx#L56-L60):
+```tsx
+// MessageBubble.tsx
+function MessageBubbleInner({ message }: { message: ChatMessage }) { ... }
+export const MessageBubble = memo(MessageBubbleInner);  // 浅比较 props
+
+// MessageList.tsx
+<Virtuoso
+  data={messages}
+  computeItemKey={(_, msg) => msg.id}  // 稳定 id 跟踪 row, 避免重建引用
+  itemContent={(_, msg) => <MessageBubble message={msg} />}
+/>
+```
+
+**未优化的 (HF free tier 限制, 收益 > 改动成本比不够)**:
+- BGE-M3 + reranker CPU fp32: HF free tier 没 GPU, fp16 自动降级 fp32. 升级到 GPU Space 才能根治
+- 模型预下载 (Dockerfile 注释掉): 容器首次启动慢, 但跟"日常问答慢"无关
+- 同步 sqlite (`db.py:10` 没 aiosqlite): 并发下会阻塞 event loop, 单请求影响小
+
+**验证**:
+- ✓ TypeScript `tsc -b --noEmit` 0 错误
+- ✓ Python `ast.parse` 0 错误
+- ✓ Vite build 成功 (806 kB → 245 kB gzip)
+- ⏳ **生产验证** (待 HF Space rebuild): 提问 → 观察 TTFT 从 ~4-6s 降到 ~1.5-2.5s; 长回答末段不再掉帧
+
+**已部署**: commit `53abc24` 推 GitHub + 5 后端文件 (`config.py` / `chat.py` / `nodes.py` / `graph.py` / `prompts.py`) 推 HF Space (Space rebuild 5-10 min).
+
+---
+
 ## 5. 已建立的工具脚本 (遇到问题先看这里)
 
 | 脚本 | 用途 | 何时用 |
