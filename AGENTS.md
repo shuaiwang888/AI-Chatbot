@@ -295,6 +295,129 @@ except Exception as e:
 
 ---
 
+### 4.11 [后端+前端] 删除文档/会话后, 后端"假删除" + HF Dataset 远端残留
+
+**症状**: 前端点删除按钮 → 列表消失 → 用户以为删干净. 实际:
+1. 本地 ChromaDB 删失败时只 warn, SQLite 行已删 → 用户看到虚假"删除成功" toast
+2. 本地 SQLite 删干净, 但 HF Dataset 远端 `chroma/*` / `sqlite/*` / `uploads/*` **永远保留**
+3. 下次冷启动 `snapshot_download` 把幽灵拉回 → "明明删了, 数据又冒出来"
+4. session 删除连 `schedule_push` 都没调, 远端 `langgraph.db` 完全不更新
+5. 失败时前端只转圈, 用户看不到原因
+
+**根因 (5 个独立 bug)**:
+
+| # | 位置 | 根因 |
+|---|---|---|
+| A | [backend/app/services/persist.py:155-163](backend/app/services/persist.py#L155-L163) | `upload_folder` 默认行为是 *"Files with the same name already present will be overwritten. **Others will be left untouched.**"*  — 必须显式传 `delete_patterns` 才会清远端. 我们的代码**没传** |
+| B | [backend/app/api/sessions.py:67-79](backend/app/api/sessions.py#L67-L79) (旧版) | 整段没有 `schedule_push()`, 远端 sqlite 永久不更新 |
+| C | [backend/app/api/sessions.py:70-78](backend/app/api/sessions.py#L70-L78) (旧版) | 先 `db.session_delete` 后 `adelete_thread`, checkpoint 失败仅 warn, 元数据已删 → "删了但聊天记录还在" |
+| D | [backend/app/services/ingestion.py:306-335](backend/app/services/ingestion.py#L306-L335) (旧版) | `delete_document` 顺序是 SQLite → ChromaDB(warn) → uploads, ChromaDB 失败仅 warn, 但前端 toast 仍弹 "已删除" → 虚假成功. `schedule_push` 走 5s debounce, 期间崩了留幽灵 |
+| E | [frontend/src/hooks/useDocuments.ts:47-55](frontend/src/hooks/useDocuments.ts#L47-L55) / [useSessions.ts:65-74](frontend/src/hooks/useSessions.ts#L65-L74) (旧版) | `useMutation` 只有 `onSuccess`, 没有 `onError`, 失败时只 `isPending` 转圈, 用户看不到原因 |
+
+**修复 (一次性 5 处, 见 commit `2184b13`)**:
+
+**A. persist.py** — `upload_folder` 加 `delete_patterns`:
+```python
+upload_folder(
+    folder_path=str(local_root),
+    repo_id=repo_id,
+    repo_type="dataset",
+    token=token,
+    commit_message=f"sync {started:.0f}",
+    ignore_patterns=[".cache/*", "*.tmp", "*.lock"],
+    delete_patterns=[
+        "chroma/*",
+        "colbert/*",
+        "sqlite/*",
+        "uploads/*",
+    ],
+)
+```
+⚠️ 需 `huggingface_hub>=0.20` (我们 0.30 满足). 用通配而不是 `delete_patterns="*"` 避免误伤 `.gitattributes` / 模型缓存.
+
+**B+C. sessions.py** — DELETE 端点重写:
+```python
+# 1) LangGraph checkpoint 先删 (失败抛 500, 元数据保留, 用户能重试)
+try:
+    graph = await get_compiled_graph()
+    checkpointer = graph.checkpointer
+    if hasattr(checkpointer, "adelete_thread"):
+        await checkpointer.adelete_thread(session_id)
+    else:
+        raise RuntimeError("Checkpointer missing adelete_thread; langgraph too old")
+except Exception as e:
+    raise HTTPException(500, detail=f"Checkpoint delete failed: {e}") from e
+
+# 2) SQLite session 行 (FK CASCADE 自动删 messages)
+db.session_delete(session_id)
+
+# 3) 同步推 HF Dataset (与 ingestion 一致, 不走 debounce)
+push_ok = await push_to_hf()
+if not push_ok:
+    logger.warning("Delete ok locally but persist push failed for session %s", session_id)
+```
+
+**D. ingestion.py** — `delete_document` 顺序调整 + 同步 push:
+```python
+# 1) ChromaDB / sparse 旁路先删 (失败抛错, 阻止后续破坏性操作)
+from app.services.vector_store import delete_by_doc
+delete_by_doc(doc_id)  # 失败抛错, 不再 warn
+
+# 2) SQLite chunks + document
+db.chunk_delete_by_doc(doc_id)
+db.doc_delete(doc_id)
+
+# 3) uploads/ 原文件
+if doc.get("sha256"):
+    up_dir = upload_dir() / doc_id
+    if up_dir.exists():
+        shutil.rmtree(up_dir, ignore_errors=True)
+
+# 4) 同步推 HF Dataset (A 改良版: 阻塞 + verify)
+push_ok = await push_to_hf()
+```
+关键点: **ChromaDB 删除失败必须立即抛错**, 不能 warn. 因为 SQLite 元数据已删的情况下, warn 等于"用户看到虚假成功, 实际残留".
+
+**E. 前端** — 装 sonner, hooks 加 onError, App.tsx 加 Toaster:
+```bash
+npm install sonner
+```
+```ts
+// useDocuments.ts
+import { toast } from 'sonner';
+import { ApiError } from '@/lib/api';
+
+export function useDeleteDocument() {
+  return useMutation({
+    mutationFn: (docId) => documentsApi.delete(docId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEY });
+      toast.success('文档已删除');
+    },
+    onError: (err) => {
+      const msg = err instanceof ApiError ? err.message : String(err);
+      toast.error(`删除失败: ${msg}`);
+    },
+  });
+}
+```
+```tsx
+// App.tsx
+import { Toaster } from 'sonner';
+<Toaster theme="dark" position="bottom-right" richColors closeButton />
+```
+
+**验证**:
+- ✓ TypeScript `tsc -b --noEmit` 0 错误
+- ✓ Python `ast.parse` 0 错误
+- ✓ Vite build 成功 (806 kB main, gzip 245 kB)
+- ✓ 对抗性 7 场景全绿 (含 blocker 1 + nice-to-have 1 二次修复)
+- ⏳ **生产验证** (待 HF Space rebuild): 删一个 doc → `curl https://huggingface.co/api/datasets/appQQQ/ai-chatbot-data/tree/main` 看到 `chroma/` 下该 doc 的 `.bin` / `sqlite/chunks` 表里该 doc_id 行 / `uploads/<doc_id>/` 目录同步消失
+
+**已部署**: commit `2184b13` 已推 GitHub (`main`). 后端部署到 HF Space 状态待用户确认 (见 §3 部署链路).
+
+---
+
 ## 5. 已建立的工具脚本 (遇到问题先看这里)
 
 | 脚本 | 用途 | 何时用 |
