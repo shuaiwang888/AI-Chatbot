@@ -551,6 +551,60 @@ export const MessageBubble = memo(MessageBubbleInner);  // 浅比较 props
 
 ---
 
+### 4.12.1 [前端] rAF flush bug — 助手消息永远 "(无回答)"
+
+**症状**: 4.12 部署后用户截图反馈: 助手气泡永远显示 "(无回答)", 但 agent trace 正常 (命中 N chunk, 来自 M 文档, 100% 完成, 引用源也正常). 重启浏览器 / 换问题都一样.
+
+**根因**: 4.12 #4 rAF 重构时, `_flushTokenBuffer` 函数 (模块顶层) 只清空 buffer 不应用 tokens:
+```ts
+// ❌ 错误实现 — 只清不应用
+function _flushTokenBuffer() {
+  if (_rafScheduled !== null) { _cancelRaf(_rafScheduled); _rafScheduled = null; }
+  _tokenBuf.length = 0;  // 末批 token 静默丢失!
+}
+```
+
+`finishAssistant` (SSE 'done' 触发) 调用 flush 试图"兜底"最后一帧 token, 但因为 flush 不调 set, 末批 token 永久丢失 → assistant message.content 永远 `""` → `MessageBubble.tsx:55-68` 渲染 `_(无回答)_`.
+
+**修复** (commit `99e6c63`): 重构为闭包内 3 个函数, 解决"flush 必须能 set"的问题:
+```ts
+// 闭包内, 能直接调 set/get
+function _applyTokenBatch(batched: string) {
+  if (!batched) return;
+  set((s) => ({ messages: s.messages.map((m) => { ... 剥离 think, 累加 content ... }) }));
+}
+function _flushTokenBufferNow() {
+  if (_rafScheduled !== null) { _cancelRaf(_rafScheduled); _rafScheduled = null; }
+  if (_tokenBuf.length === 0) return;
+  const batched = _tokenBuf.join('');
+  _tokenBuf.length = 0;
+  _applyTokenBatch(batched);  // ✅ 真的应用
+}
+function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需要应用)
+  if (_rafScheduled !== null) { _cancelRaf(_rafScheduled); _rafScheduled = null; }
+  _tokenBuf.length = 0;
+}
+```
+
+**调用约定 (重要!)**:
+- `finishAssistant` / `failAssistant` → `_flushTokenBufferNow()` (必须应用最后一帧)
+- `loadSessionMessages` / `reset` → `_clearTokenBuffer()` (要清的是错的 state, 不能应用)
+- `appendToken` 内 rAF 触发 → `_applyTokenBatch(batched)` (直接调, 不走 flush)
+
+**教训**:
+- 性能优化**不能破坏正确性**. 重构时只想到"清 buffer"忘了"应用 buffer"是典型错误.
+- 模块顶层函数 (如 `_flushTokenBuffer`) 无法 set state, 应放进 create() 闭包内.
+- 任何 flush 类操作都要明确: **应用** vs **丢弃**. 这是两个不同的语义, 不能用同一个函数.
+
+**验证**:
+- ✓ TypeScript tsc -b --noEmit 0 错
+- ✓ Vite build 成功
+- ⏳ **生产验证**: GitHub 已推, GH Pages 部署后提问, 助手消息应正常显示
+
+**已部署**: commit `99e6c63` 推 GitHub (`main`). 等 GH Pages 部署即可生效 (后端未变, 不需 HF rebuild).
+
+---
+
 ## 5. 已建立的工具脚本 (遇到问题先看这里)
 
 | 脚本 | 用途 | 何时用 |
