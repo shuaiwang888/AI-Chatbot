@@ -78,11 +78,9 @@ interface ChatState {
   toggleCitations: () => void;
 }
 
-// ========== 模块级 buffer (rAF 帧合并) ==========
+// ========== 模块级 rAF 工具 (SSR 兜底) ==========
 // ⚡ 跨 token 累积: 多个 SSE token 推入 _tokenBuf, 同一帧内只触发 1 次 set.
 // SSR / 测试环境没 requestAnimationFrame, 退化为 setTimeout 16ms.
-const _tokenBuf: string[] = [];
-let _rafScheduled: number | null = null;
 const _rafImpl: (cb: () => void) => number =
   typeof requestAnimationFrame === 'function'
     ? requestAnimationFrame
@@ -92,18 +90,88 @@ const _cancelRaf: (id: number) => void =
     ? cancelAnimationFrame
     : ((id: number) => clearTimeout(id));
 
-/** 立即 flush buffer (finishAssistant / failAssistant / reset 时调用, 避免漏渲染) */
-function _flushTokenBuffer() {
-  if (_rafScheduled !== null) {
-    _cancelRaf(_rafScheduled);
-    _rafScheduled = null;
-  }
-  _tokenBuf.length = 0;
-}
+// THINK 块边界常量 (跟 chatStore 内同步)
+const _THINK_OPEN = '<think' + '>';
+const _THINK_CLOSE = '</think' + '>';
 
 
 export const useChatStore = create<ChatState>()(
-  subscribeWithSelector((set, get) => ({
+  subscribeWithSelector((set, get) => {
+    // ⚡ 模块级 buffer 放在 create 闭包内, 这样 flush 函数能直接 set/get state.
+    // 之前放模块顶层导致 _flushTokenBuffer 无法 set, 只能 .length=0 清掉 → 丢最后一批 token!
+    const _tokenBuf: string[] = [];
+    let _rafScheduled: number | null = null;
+
+    /** 把 batched 字符串应用到 state, 走跟单 token 一样的 think 剥离逻辑. */
+    function _applyTokenBatch(batched: string) {
+      if (!batched) return;
+      set((s) => ({
+        messages: s.messages.map((m) => {
+          if (m.id !== s.currentAssistantId) return m;
+          const acc = m.content;
+          const think = m.thinking || '';
+          const buf = m._thinkBuf || '';
+          const stream = buf + batched;
+          let cursor = 0;
+          let outContent = '';
+          let outThink = '';
+          let state: 'normal' | 'in_think' = (m._thinkState as any) || 'normal';
+          while (cursor < stream.length) {
+            if (state === 'normal') {
+              const openIdx = stream.indexOf(_THINK_OPEN, cursor);
+              if (openIdx === -1) {
+                outContent += stream.slice(cursor);
+                cursor = stream.length;
+                break;
+              }
+              outContent += stream.slice(cursor, openIdx);
+              cursor = openIdx + _THINK_OPEN.length;
+              state = 'in_think';
+            } else {
+              const closeIdx = stream.indexOf(_THINK_CLOSE, cursor);
+              if (closeIdx === -1) {
+                outThink += stream.slice(cursor);
+                cursor = stream.length;
+                break;
+              }
+              outThink += stream.slice(cursor, closeIdx);
+              cursor = closeIdx + _THINK_CLOSE.length;
+              state = 'normal';
+            }
+          }
+          return {
+            ...m,
+            content: acc + outContent,
+            thinking: think + outThink,
+            _thinkState: state,
+            _thinkBuf: state === 'in_think' ? stream.slice(cursor) : '',
+          };
+        }),
+      }));
+    }
+
+    /** 同步 flush: 取消 pending rAF, 立即把 buffer 应用到 state. */
+    function _flushTokenBufferNow() {
+      if (_rafScheduled !== null) {
+        _cancelRaf(_rafScheduled);
+        _rafScheduled = null;
+      }
+      if (_tokenBuf.length === 0) return;
+      const batched = _tokenBuf.join('');
+      _tokenBuf.length = 0;
+      _applyTokenBatch(batched);
+    }
+
+    /** 简单清空 (不应用, 切 session / reset 时用, 因为要清的是错的 state). */
+    function _clearTokenBuffer() {
+      if (_rafScheduled !== null) {
+        _cancelRaf(_rafScheduled);
+        _rafScheduled = null;
+      }
+      _tokenBuf.length = 0;
+    }
+
+    return {
     sessionId: '',
     messages: [],
     isStreaming: false,
@@ -131,7 +199,7 @@ export const useChatStore = create<ChatState>()(
         // 让用户先 stop 再切 (或忽略, 由 UI 处理).
         return;
       }
-      _flushTokenBuffer();  // 切 session 时丢掉残留 token
+      _clearTokenBuffer();  // 切 session 时丢掉残留 token (不应用, 因为要换 messages)
       const messages: ChatMessage[] = (msgs ?? []).map((m) => ({
         id: m.id,
         role: m.role as ChatMessage['role'],
@@ -188,52 +256,7 @@ export const useChatStore = create<ChatState>()(
         if (_tokenBuf.length === 0) return;
         const batched = _tokenBuf.join('');
         _tokenBuf.length = 0;  // 清空 buffer, 保留同一引用 (const)
-        set((s) => ({
-          messages: s.messages.map((m) => {
-            if (m.id !== s.currentAssistantId) return m;
-            // 实时剥离 思考块: 块内 → thinking, 块外 → content
-            const acc = m.content;
-            const think = m.thinking || '';
-            const buf = m._thinkBuf || '';
-            const stream = buf + batched;
-            let cursor = 0;
-            let outContent = '';
-            let outThink = '';
-            let state: 'normal' | 'in_think' = (m._thinkState as any) || 'normal';
-            const THINK_OPEN = '<think' + '>';
-            const THINK_CLOSE = '</think' + '>';
-            while (cursor < stream.length) {
-              if (state === 'normal') {
-                const openIdx = stream.indexOf(THINK_OPEN, cursor);
-                if (openIdx === -1) {
-                  outContent += stream.slice(cursor);
-                  cursor = stream.length;
-                  break;
-                }
-                outContent += stream.slice(cursor, openIdx);
-                cursor = openIdx + THINK_OPEN.length;
-                state = 'in_think';
-              } else {
-                const closeIdx = stream.indexOf(THINK_CLOSE, cursor);
-                if (closeIdx === -1) {
-                  outThink += stream.slice(cursor);
-                  cursor = stream.length;
-                  break;
-                }
-                outThink += stream.slice(cursor, closeIdx);
-                cursor = closeIdx + THINK_CLOSE.length;
-                state = 'normal';
-              }
-            }
-            return {
-              ...m,
-              content: acc + outContent,
-              thinking: think + outThink,
-              _thinkState: state,
-              _thinkBuf: state === 'in_think' ? stream.slice(cursor) : '',
-            };
-          }),
-        }));
+        _applyTokenBatch(batched);
       });
     },
 
@@ -317,7 +340,7 @@ export const useChatStore = create<ChatState>()(
     },
 
     finishAssistant: () => {
-      _flushTokenBuffer();  // 兜底 flush, 防止最后一帧 token 没渲
+      _flushTokenBufferNow();  // ⚠️ 必须 flush **应用** 最后一帧, 不然末批 token 丢
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === s.currentAssistantId ? { ...m, streaming: false } : m,
@@ -328,7 +351,7 @@ export const useChatStore = create<ChatState>()(
     },
 
     failAssistant: (error) => {
-      _flushTokenBuffer();  // 兜底 flush
+      _flushTokenBufferNow();  // ⚠️ 必须 flush 应用
       set((s) => ({
         messages: s.messages.map((m) =>
           m.id === s.currentAssistantId
@@ -342,12 +365,13 @@ export const useChatStore = create<ChatState>()(
     },
 
     reset: () => {
-      _flushTokenBuffer();
+      _clearTokenBuffer();
       set({ messages: [], error: null, currentAssistantId: null, isStreaming: false, loadingSessionId: null });
     },
     toggleAgentTrace: () => set((s) => ({ showAgentTrace: !s.showAgentTrace })),
     toggleCitations: () => set((s) => ({ showCitations: !s.showCitations })),
-  })),
+  };
+  })
 );
 
 /**
