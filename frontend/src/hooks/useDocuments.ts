@@ -49,9 +49,10 @@ export function useDeleteDocument() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (docId: string) => documentsApi.delete(docId),
-    onSuccess: () => {
+    onSuccess: (result) => {
       qc.invalidateQueries({ queryKey: KEY });
-      toast.success('文档已删除');
+      if (result.persisted) toast.success('文档已删除');
+      else toast.warning(result.warning || '文档已在本地删除，远端备份正在重试');
     },
     onError: (err) => {
       const msg = err instanceof ApiError ? err.message : String(err);

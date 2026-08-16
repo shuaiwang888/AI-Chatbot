@@ -308,6 +308,15 @@ def session_upsert(session_id: str, user_id: str = "default", title: str | None 
     )
 
 
+def session_update_title(session_id: str, title: str | None) -> bool:
+    """Explicit user rename, unlike session_upsert's first-title-only semantics."""
+    cur = get_conn().execute(
+        "UPDATE sessions SET title = ?, updated_at = ? WHERE id = ?",
+        (title, time.time(), session_id),
+    )
+    return cur.rowcount > 0
+
+
 def session_list(limit: int = 50) -> list[dict[str, Any]]:
     rows = get_conn().execute(
         "SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?", (limit,)

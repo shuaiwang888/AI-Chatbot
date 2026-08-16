@@ -13,7 +13,7 @@ class ChatRequest(BaseModel):
     session_id: str = Field(default="default", description="会话 ID, 用于 LangGraph checkpoint 隔离")
     message: str = Field(..., min_length=1, max_length=8000)
     # 预留: 未来可加 doc_id 白名单 / 工具开关
-    doc_ids: list[str] | None = None
+    doc_ids: list[str] | None = Field(default=None, max_length=100)
     locale: Literal["zh", "en"] = "zh"
 
 

@@ -21,12 +21,15 @@
 
 部署步骤见 [docs/deployment.md](docs/deployment.md)。代码改动通过：
 - **前端** → `git push main` → GH Actions 自动 build & deploy
-- **后端** → `./scripts/deploy-backend-fix.sh` → 推到 HF Space 仓库
+- **后端** → `HF_TOKEN` 注入环境后运行 `python3 scripts/deploy-via-api.py` → 推到 HF Space 仓库
+
+首次部署必须在 Space Secrets 配置 `API_ACCESS_TOKEN` 与 `ADMIN_ACCESS_TOKEN`。
+网页首次打开时通过顶部钥匙按钮输入 `API_ACCESS_TOKEN`；令牌仅保存在该浏览器会话内，绝不会进入 GitHub Pages bundle。
 
 ## ✨ 功能
 
 - 📄 **多格式文档摄入**: PDF / Word / PPT / Excel / 图片 (中英 OCR)
-- 🧠 **混合检索**: BGE-M3 dense + sparse + ColBERT 三路 → RRF 融合
+- 🧠 **混合检索**: BGE-M3 dense + sparse → RRF 融合（ColBERT 为可选增强）
 - 🎯 **精排 + CRAG 自校正**: BGE-reranker-v2-m3 + 二阶段评估, 拒答有度
 - 💬 **多轮对话**: LangGraph SQLite checkpoint, 持久化
 - 📚 **引用源**: 每次回答附 page + heading + snippet + score
@@ -181,7 +184,7 @@ cd /app && python tests/unit/smoke_phase3.py   # Agent 端到端
 - ✅ `calculate` 工具用 AST 沙箱, 防 prompt injection
 - ✅ 路径穿越防护 (`Path(name).name`)
 - ✅ MIME 嗅探, 50MB 上限
-- ✅ CORS 白名单 (非 `*`)
+- ✅ 请求令牌保护 + 管理员令牌保护（CORS 仅用于浏览器跨域控制）
 - ✅ 异常统一处理 (AppError + 全局 handler)
 - ✅ 所有 API key 走 Secrets, 不入仓
 

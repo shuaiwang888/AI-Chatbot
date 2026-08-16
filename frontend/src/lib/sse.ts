@@ -12,6 +12,7 @@
  *   \n\n
  */
 import { apiBase } from '@/env';
+import { accessHeaders } from '@/lib/auth';
 import type { StreamEventPayload, StreamEventType } from '@/types';
 
 export class SSEError extends Error {
@@ -36,7 +37,7 @@ export async function* streamChat(
 ): AsyncGenerator<StreamEventPayload, void, void> {
   const res = await fetch(`${apiBase}/api/v1/chat/stream`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...accessHeaders() },
     body: JSON.stringify(body),
     signal: options.signal,
   });

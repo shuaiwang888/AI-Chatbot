@@ -8,10 +8,10 @@ on:
       - '.github/workflows/deploy-frontend.yml'
   workflow_dispatch:
 
-# 允许并发部署, 但同 branch 排队
+# Newer commits supersede an older queued Pages deployment.
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 permissions:
   contents: read

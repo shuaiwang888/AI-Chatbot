@@ -26,6 +26,9 @@ const REPO_NAME = resolveRepoName();
 if (!REPO_NAME.match(/^[A-Za-z0-9._-]+$/)) {
   throw new Error(`Invalid VITE_REPO_NAME / GITHUB_REPOSITORY: "${REPO_NAME}"`);
 }
+if (process.env.CI && !process.env.VITE_API_BASE) {
+  throw new Error('VITE_API_BASE must be configured for CI production builds');
+}
 
 // build 启动时打印, 方便 GH Actions log 一眼看出 base 是否正确
 // eslint-disable-next-line no-console

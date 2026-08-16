@@ -1,7 +1,7 @@
 /**
  * 文档卡片 (单条). 点击打开详情, 进度条显示摄入进度.
  */
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import {
   FileText, Trash2, Loader2, AlertCircle, CheckCircle2, Clock, Eye,
 } from 'lucide-react';
@@ -12,7 +12,11 @@ import { formatBytes, formatRelativeTime, truncateFilename } from '@/lib/utils';
 import type { DocumentMeta } from '@/types';
 import { useDeleteDocument } from '@/hooks/useDocuments';
 import { cn } from '@/lib/utils';
-import { DocumentDetailDialog } from './DocumentDetailDialog';
+
+// The chunk preview is large and only opened on demand.
+const DocumentDetailDialog = lazy(() =>
+  import('./DocumentDetailDialog').then((m) => ({ default: m.DocumentDetailDialog })),
+);
 
 const STATUS_MAP: Record<
   DocumentMeta['status'],
@@ -119,11 +123,15 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
         </CardContent>
       </Card>
 
-      <DocumentDetailDialog
-        docId={doc.id}
-        open={detailOpen}
-        onOpenChange={setDetailOpen}
-      />
+      {detailOpen && (
+        <Suspense fallback={null}>
+          <DocumentDetailDialog
+            docId={doc.id}
+            open={detailOpen}
+            onOpenChange={setDetailOpen}
+          />
+        </Suspense>
+      )}
     </>
   );
 }

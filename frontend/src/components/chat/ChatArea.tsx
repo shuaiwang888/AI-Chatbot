@@ -23,9 +23,12 @@
  */
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
-import LightRays from '@/components/effects/LightRays';
+import { lazy, Suspense } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { useUIStore } from '@/stores/uiStore';
+
+// WebGL/OGL is decorative; keep it out of the initial interactive bundle.
+const LightRays = lazy(() => import('@/components/effects/LightRays'));
 
 export function ChatArea() {
   const sessionId = useChatStore((s) => s.sessionId);
@@ -38,17 +41,19 @@ export function ChatArea() {
         <div
           className="pointer-events-none absolute inset-0 -z-10 mix-blend-screen opacity-60"
         >
-          <LightRays
-            raysOrigin="top-center"
-            raysColor="#8b9eff"
-            raysSpeed={0.6}
-            lightSpread={0.55}
-            rayLength={1.6}
-            followMouse={true}
-            mouseInfluence={0.15}
-            noiseAmount={0.05}
-            distortion={0.03}
-          />
+          <Suspense fallback={null}>
+            <LightRays
+              raysOrigin="top-center"
+              raysColor="#8b9eff"
+              raysSpeed={0.6}
+              lightSpread={0.55}
+              rayLength={1.6}
+              followMouse={true}
+              mouseInfluence={0.15}
+              noiseAmount={0.05}
+              distortion={0.03}
+            />
+          </Suspense>
         </div>
       )}
 

@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 from app.core.errors import AppError, DocumentNotFoundError
+from app.core.auth import require_access_token
 from app.models import db
 from app.models.schemas import DocumentChunk, IngestResult
 from app.services.ingestion import (
@@ -16,7 +17,7 @@ from app.services.ingestion import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/documents", tags=["documents"])
+router = APIRouter(prefix="/documents", tags=["documents"], dependencies=[Depends(require_access_token)])
 
 
 @router.get("")
@@ -99,7 +100,12 @@ async def upload(file: UploadFile = File(...)) -> IngestResult:
 
 @router.delete("/{doc_id}")
 async def delete_doc(doc_id: str) -> dict:
-    ok = await delete_document(doc_id)
+    ok, persisted = await delete_document(doc_id)
     if not ok:
         raise DocumentNotFoundError(f"Document {doc_id} not found", code="doc_not_found")
-    return {"doc_id": doc_id, "deleted": True}
+    return {
+        "doc_id": doc_id,
+        "deleted": True,
+        "persisted": persisted,
+        "warning": None if persisted else "Local deletion succeeded; remote backup retry is pending.",
+    }

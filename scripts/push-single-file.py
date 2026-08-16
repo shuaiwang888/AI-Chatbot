@@ -12,6 +12,10 @@ if not TOKEN:
     print("❌ HF_TOKEN env var required", file=sys.stderr)
     sys.exit(1)
 
+if len(sys.argv) < 3:
+    print("Usage: push-single-file.py <local_relpath> <path_in_repo> [commit_msg]", file=sys.stderr)
+    sys.exit(2)
+
 api = HfApi(token=TOKEN)
 me = api.whoami()
 print(f"✓ Auth: {me.get('name', '?')}")

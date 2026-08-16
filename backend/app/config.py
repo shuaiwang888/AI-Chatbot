@@ -6,19 +6,6 @@
 """
 from __future__ import annotations
 
-# Monkey patch transformers to bypass torch.load safety check on old PyTorch versions (macOS x86_64)
-try:
-    import transformers.utils.import_utils
-    transformers.utils.import_utils.check_torch_load_is_safe = lambda *args, **kwargs: None
-except ImportError:
-    pass
-
-try:
-    import transformers.modeling_utils
-    transformers.modeling_utils.check_torch_load_is_safe = lambda *args, **kwargs: None
-except ImportError:
-    pass
-
 # Force CPU device for PyTorch MPS on Intel Macs to prevent NotImplementedError
 try:
     import torch
@@ -88,6 +75,15 @@ class Settings(BaseSettings):
     hf_token: SecretStr = Field(default=SecretStr(""))
     persist_on_write: bool = True
 
+    # ========== API access control ==========
+    # Public HF Spaces have a public URL; CORS does not stop direct HTTP calls.
+    # Keep the application closed until a token is configured.  Tests may opt out
+    # explicitly with AUTH_REQUIRED=false.
+    auth_required: bool = True
+    api_access_token: SecretStr = Field(default=SecretStr(""))
+    admin_access_token: SecretStr = Field(default=SecretStr(""))
+    expose_error_details: bool = False
+
     # ========== 数据目录 ==========
     data_dir: Path = Path("./data")
     upload_dir: Path = Path("./data/uploads")
@@ -108,7 +104,7 @@ class Settings(BaseSettings):
 
     # ========== 解析器 ==========
     parser_primary: Literal["docling", "marker", "mineru", "vlm", "simple", "markdown"] = "docling"
-    parser_fallback: Literal["docling", "marker", "mineru", "vlm", "simple", "markdown"] = "marker"
+    parser_fallback: Literal["docling", "marker", "mineru", "vlm", "simple", "markdown"] = "simple"
     parser_enable_ocr: bool = True
     parser_table_structure: bool = True
 

@@ -218,7 +218,7 @@ async def main() -> int:
             results.append(check("  text 长度合理", 50 < len(top.text) < 5000, f"len={len(top.text)}"))
 
         # 7. delete
-        ok = await delete_document(result.doc_id)
+        ok, _persisted = await delete_document(result.doc_id)
         results.append(check("delete 成功", ok))
         results.append(check("  get 返 None", get_document(result.doc_id) is None))
 

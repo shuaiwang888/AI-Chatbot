@@ -104,6 +104,55 @@ def test_chunking_preserves_headings():
     assert "标题二" in headings
 
 
+def test_access_control_fails_closed_without_deployment_secret():
+    """A public Space must not silently become an unauthenticated data API."""
+    from fastapi import HTTPException
+    from app.core.auth import require_access_token
+
+    try:
+        asyncio.run(require_access_token(None))
+    except HTTPException as exc:
+        assert exc.status_code in (401, 503)
+    else:
+        # CI intentionally sets AUTH_REQUIRED=false; production defaults to on.
+        from app.config import settings
+        assert settings.auth_required is False
+
+
+def test_document_scope_is_carried_by_agent_state():
+    """The public doc_ids contract must reach retrieval instead of being ignored."""
+    from app.agents.state import empty_state_for
+
+    state = empty_state_for("scope-test", requested_doc_ids=["a", "a", "b"])
+    assert state["requested_doc_ids"] == ["a", "a", "b"]
+
+
+def test_colbert_storage_preserves_sparse_weights():
+    """Optional ColBERT must augment, never replace, lexical retrieval data."""
+    import uuid
+    import numpy as np
+
+    from app.config import settings
+    from app.core.paths import data_dir
+    from app.models import db
+    from app.services.vector_store import SparseSidecar
+
+    db.init_db()
+    sidecar = SparseSidecar(settings.sqlite_db_path)
+    chunk_id = f"sparse-colbert-{uuid.uuid4().hex}"
+    sidecar.upsert_bulk([(chunk_id, {7: 0.75})])
+    sidecar.upsert_colbert([(chunk_id, np.zeros((1, 4), dtype=np.float32))])
+
+    assert sidecar.get_sparse(chunk_id) == {7: 0.75}
+    colbert_path = sidecar.get_colbert_path(chunk_id)
+    assert colbert_path
+
+    conn = db.get_conn()
+    conn.execute("DELETE FROM chunk_sparse WHERE chunk_id = ?", (chunk_id,))
+    conn.execute("DELETE FROM chunk_colbert WHERE chunk_id = ?", (chunk_id,))
+    (data_dir() / colbert_path).unlink(missing_ok=True)
+
+
 # ========== 端到端 (用 deepeval) ==========
 def test_deepeval_e2e():
     """DeepEval 端到端: 摄入 → 检索 → 回答 → 4 个指标.

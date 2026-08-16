@@ -54,7 +54,10 @@ class RetrievalHit:
 class SparseSidecar:
     """存 sparse lexical weights, 用 sqlite 反查 + 打分.
 
-    表 schema: chunk_sparse(chunk_id, weights_json)
+    表 schema: chunk_sparse(chunk_id, weights_json) +
+    chunk_colbert(chunk_id, path).  The two representations must not share a
+    row: replacing sparse weights with a ColBERT path silently disabled sparse
+    retrieval whenever ColBERT was enabled.
     """
 
     def __init__(self, db_path: Path) -> None:
@@ -72,6 +75,29 @@ class SparseSidecar:
                 )
                 """
             )
+            db.get_conn().execute(
+                """
+                CREATE TABLE IF NOT EXISTS chunk_colbert (
+                    chunk_id TEXT PRIMARY KEY,
+                    path TEXT NOT NULL
+                )
+                """
+            )
+            # One-time repair for the previous schema that stored a ColBERT
+            # path in chunk_sparse and overwrote lexical weights.
+            legacy = db.get_conn().execute(
+                "SELECT chunk_id, weights_json FROM chunk_sparse WHERE weights_json LIKE '%colbert_path%'"
+            ).fetchall()
+            for row in legacy:
+                try:
+                    path = json.loads(row["weights_json"])["colbert_path"]
+                    db.get_conn().execute(
+                        "INSERT OR REPLACE INTO chunk_colbert (chunk_id, path) VALUES (?, ?)",
+                        (row["chunk_id"], path),
+                    )
+                    db.get_conn().execute("DELETE FROM chunk_sparse WHERE chunk_id = ?", (row["chunk_id"],))
+                except (KeyError, TypeError, json.JSONDecodeError):
+                    logger.warning("Ignoring malformed legacy ColBERT row for %s", row["chunk_id"])
 
     def upsert_bulk(self, items: list[tuple[str, dict[int, float]]]) -> None:
         if not items:
@@ -83,7 +109,7 @@ class SparseSidecar:
             )
 
     def upsert_colbert(self, items: list[tuple[str, np.ndarray]]) -> None:
-        """ColBERT 多向量太占地方, 暂存为 .npy 文件, 路径记到 chunk_sparse 旁表."""
+        """ColBERT 多向量暂存为 .npy 文件; keep its path separate from sparse."""
         if not items:
             return
         from app.core.paths import data_dir
@@ -95,13 +121,13 @@ class SparseSidecar:
                 path = colbert_dir / f"{cid}.npy"
                 np.save(path, vec)
                 db.get_conn().execute(
-                    "INSERT OR REPLACE INTO chunk_sparse (chunk_id, weights_json) VALUES (?, ?)",
-                    (cid, json.dumps({"colbert_path": str(path.relative_to(data_dir()))})),
+                    "INSERT OR REPLACE INTO chunk_colbert (chunk_id, path) VALUES (?, ?)",
+                    (cid, str(path.relative_to(data_dir()))),
                 )
 
     def get_sparse(self, chunk_id: str) -> dict[int, float] | None:
         row = db.get_conn().execute(
-            "SELECT weights_json FROM chunk_sparse WHERE chunk_id = ? AND weights_json NOT LIKE '%colbert_path%'",
+            "SELECT weights_json FROM chunk_sparse WHERE chunk_id = ?",
             (chunk_id,),
         ).fetchone()
         if not row:
@@ -114,15 +140,14 @@ class SparseSidecar:
 
     def get_colbert_path(self, chunk_id: str) -> str | None:
         row = db.get_conn().execute(
-            "SELECT weights_json FROM chunk_sparse WHERE chunk_id = ? AND weights_json LIKE '%colbert_path%'",
+            "SELECT path FROM chunk_colbert WHERE chunk_id = ?",
             (chunk_id,),
         ).fetchone()
         if not row:
             return None
         try:
-            d = json.loads(row["weights_json"])
-            return d.get("colbert_path")
-        except json.JSONDecodeError:
+            return str(row["path"])
+        except (KeyError, TypeError):
             return None
 
     def score_sparse(
@@ -154,10 +179,22 @@ class SparseSidecar:
         if not rows:
             return 0
         ids = [r["id"] for r in rows]
+        colbert_paths = db.get_conn().execute(
+            f"SELECT path FROM chunk_colbert WHERE chunk_id IN ({','.join('?' * len(ids))})", ids
+        ).fetchall()
         cur = db.get_conn().execute(
             f"DELETE FROM chunk_sparse WHERE chunk_id IN ({','.join('?' * len(ids))})",
             ids,
         )
+        db.get_conn().execute(
+            f"DELETE FROM chunk_colbert WHERE chunk_id IN ({','.join('?' * len(ids))})", ids
+        )
+        from app.core.paths import data_dir
+        for row in colbert_paths:
+            try:
+                (data_dir() / row["path"]).unlink(missing_ok=True)
+            except OSError as e:
+                logger.warning("Failed to remove ColBERT vector %s: %s", row["path"], e)
         return cur.rowcount
 
 

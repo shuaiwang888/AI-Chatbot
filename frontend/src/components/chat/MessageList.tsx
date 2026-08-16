@@ -2,14 +2,16 @@
  * 消息列表. 含 ThinkingPanel / AgentStepTrace / CitationPanel 的内联展示.
  * 用 react-virtuoso 虚拟化, 适合长对话.
  */
-import { useEffect, useRef } from 'react';
+import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { MessageBubble } from './MessageBubble';
 import { ThinkingPanel } from './ThinkingPanel';
 import { AgentStepTrace } from './AgentStepTrace';
 import { CitationPanel } from './CitationPanel';
 import { useChatStore } from '@/stores/chatStore';
+
+// Markdown + syntax highlighting are only needed once a message is rendered.
+const MessageBubble = lazy(() => import('./MessageBubble').then((m) => ({ default: m.MessageBubble })));
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
@@ -76,7 +78,9 @@ export function MessageList() {
               )}
             </div>
           )}
-          <MessageBubble message={msg} />
+          <Suspense fallback={<div className="h-16 rounded-lg bg-muted/40" />}>
+            <MessageBubble message={msg} />
+          </Suspense>
           {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
             <div className="ml-11">
               <CitationPanel citations={msg.citations} />

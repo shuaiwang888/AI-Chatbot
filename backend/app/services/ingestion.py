@@ -181,6 +181,9 @@ async def _ingest_locked(content: bytes, filename: str) -> IngestResult:
         if not embed_texts:
             logger.warning("No chunks to embed for %s", filename)
             db.doc_update_status(doc_id, "ready", chunk_count=0, progress=100, progress_label="完成 (空文档)")
+            # Empty documents are still user data: persist their metadata and
+            # original upload before returning.
+            await push_to_hf()
             return IngestResult(doc_id=doc_id, chunk_count=0, status="ready")
 
         # batch 编码
@@ -303,7 +306,7 @@ async def _ingest_locked(content: bytes, filename: str) -> IngestResult:
         ) from e
 
 
-async def delete_document(doc_id: str) -> bool:
+async def delete_document(doc_id: str) -> tuple[bool, bool | None]:
     """完整删除: ChromaDB + 旁路 sparse + SQLite + uploads/ + HF Dataset.
 
     删除顺序 (重要, 验证后定稿):
@@ -320,7 +323,7 @@ async def delete_document(doc_id: str) -> bool:
     # 先查, 拿文件路径
     doc = db.doc_get(doc_id)
     if doc is None:
-        return False
+        return False, None
 
     # 1) ChromaDB / sparse 旁路先删 (失败抛错, 阻止后续破坏性操作)
     from app.services.vector_store import delete_by_doc
@@ -347,7 +350,11 @@ async def delete_document(doc_id: str) -> bool:
             "until next successful push or manual cleanup.",
             doc_id,
         )
-    return True
+        # Keep retrying after a transient HF outage; the response below makes
+        # the incomplete remote deletion explicit to the caller.
+        from app.services.persist import schedule_push
+        await schedule_push()
+    return True, push_ok
 
 
 def list_documents(limit: int = 100) -> list[dict[str, Any]]:

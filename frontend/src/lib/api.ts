@@ -8,12 +8,14 @@
  * - SSE 流式不走这里, 走 sse.ts
  */
 import { apiBase } from '@/env';
+import { accessHeaders } from '@/lib/auth';
 import type {
   ChatRequest,
   ChatResponse,
   DocumentChunk,
   DocumentChunksResponse,
   DocumentMeta,
+  DeleteResult,
   HealthStatus,
   IngestResult,
   SessionDetail,
@@ -40,6 +42,7 @@ async function _request<T>(path: string, init: RequestInit = {}): Promise<T> {
       ...(init.body && !(init.body instanceof FormData)
         ? { 'Content-Type': 'application/json' }
         : {}),
+      ...accessHeaders(),
       ...init.headers,
     },
   });
@@ -109,7 +112,7 @@ export const documentsApi = {
     });
   },
   delete: (docId: string) =>
-    _request<{ doc_id: string; deleted: boolean }>(`/api/v1/documents/${docId}`, {
+    _request<DeleteResult>(`/api/v1/documents/${docId}`, {
       method: 'DELETE',
     }),
 };
@@ -132,7 +135,7 @@ export const sessionsApi = {
       body: JSON.stringify(body),
     }),
   delete: (sessionId: string) =>
-    _request<{ session_id: string; deleted: boolean }>(`/api/v1/sessions/${sessionId}`, {
+    _request<DeleteResult>(`/api/v1/sessions/${sessionId}`, {
       method: 'DELETE',
     }),
 };

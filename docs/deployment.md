@@ -11,6 +11,10 @@
 > ⚠️ **本项目不支持本机本地启动**. 所有 dev script (npm run dev / vite preview / uvicorn reload) 已删除,
 > CORS 默认值改为空列表 (不显式配 `ALLOWED_ORIGINS` 直接启动会被拒), 防止误以为可以本地起.
 
+> **当前唯一推荐的后端部署方式**：`export HF_TOKEN=...` 后运行
+> `python3 scripts/deploy-via-api.py`。不要使用 `deploy-backend-fix.sh`、
+> `deploy-now.sh` 或把 token 写进 git URL；它们仅为历史排障脚本。
+
 ---
 
 ## 0. 架构总览
@@ -147,8 +151,10 @@ git clone https://appQQQ:<TOKEN>@hf-mirror.com/spaces/appQQQ/ai-chatbot
 | `LLM_CACHE_ENABLED` | variable | `true` | 重复问题走缓存省钱 |
 | `HF_PERSIST_REPO` | secret (可选) | `appQQQ/ai-chatbot-data` | 备份数据到 HF Dataset |
 | `HF_TOKEN` | secret (可选) | `<write token>` | HF 写权限 |
+| `API_ACCESS_TOKEN` | secret | 随机长令牌 | 所有聊天、文档、会话 API 的 `X-API-Token` |
+| `ADMIN_ACCESS_TOKEN` | secret | 另一随机长令牌 | `/api/v1/admin/*` 的 `X-Admin-Token` |
 
-> ⚠️ **Pydantic Settings 大小写敏感**, 名称必须**完全一致** (上面表格里复制).
+> 变量名按上表配置；部署默认是 fail-closed，遗漏 `API_ACCESS_TOKEN` 会使业务 API 返回 503，而不是公开知识库。
 
 ### 2.4 重启 + 验证
 

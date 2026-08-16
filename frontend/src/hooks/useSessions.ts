@@ -67,10 +67,11 @@ export function useDeleteSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: string) => sessionsApi.delete(sessionId),
-    onSuccess: (_data, vars) => {
+    onSuccess: (result, vars) => {
       qc.invalidateQueries({ queryKey: KEY });
       qc.removeQueries({ queryKey: ['sessions', vars] });
-      toast.success('对话已删除');
+      if (result.persisted) toast.success('对话已删除');
+      else toast.warning(result.warning || '对话已在本地删除，远端备份正在重试');
     },
     onError: (err) => {
       const msg = err instanceof ApiError ? err.message : String(err);
@@ -96,4 +97,3 @@ export function sortSessions(sessions: SessionMeta[] | undefined): SessionMeta[]
   if (!sessions) return [];
   return [...sessions].sort((a, b) => b.updated_at - a.updated_at);
 }
-

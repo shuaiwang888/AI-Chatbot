@@ -1,13 +1,14 @@
 /**
  * 顶部栏: 标题 + 状态指示 + 侧栏切换按钮.
  */
-import { Activity, Cpu, Database, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Cpu, Database, KeyRound, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { healthApi } from '@/lib/api';
 import { useUIStore } from '@/stores/uiStore';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/auth';
 
 export function TopBar() {
   const { data: health, isError, isLoading } = useQuery({
@@ -23,6 +24,18 @@ export function TopBar() {
   const toggleRight = useUIStore((s) => s.toggleRightSidebar);
   const showFluid = useUIStore((s) => s.showFluidBackground);
   const toggleFluid = useUIStore((s) => s.toggleFluidBackground);
+
+  const handleAccessToken = () => {
+    const current = getAccessToken();
+    const value = window.prompt(
+      current ? '更新访问令牌；留空将清除当前令牌。' : '请输入部署管理员提供的访问令牌。',
+      current || '',
+    );
+    if (value === null) return;
+    if (value.trim()) setAccessToken(value);
+    else clearAccessToken();
+    window.location.reload();
+  };
 
   const online = !isError && health?.llm;
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
@@ -74,6 +87,16 @@ export function TopBar() {
           {health?.llm ? 'LLM ✓' : 'LLM ✗'}
         </Badge>
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+        <Button
+          size="icon"
+          variant={getAccessToken() ? 'secondary' : 'ghost'}
+          onClick={handleAccessToken}
+          title={getAccessToken() ? '更新或清除访问令牌' : '设置访问令牌'}
+          aria-label="设置访问令牌"
+          className="shrink-0"
+        >
+          <KeyRound className="h-4 w-4" />
+        </Button>
         <Button
           size="icon"
           variant={showFluid ? 'secondary' : 'ghost'}

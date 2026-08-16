@@ -168,6 +168,8 @@ async def retrieve_node(state: AgentState) -> dict[str, Any]:
 
     # multi_step: 每步独立检索再合并
     plan = state.get("plan") or []
+    requested_doc_ids = state.get("requested_doc_ids") or []
+    where = {"doc_id": {"$in": requested_doc_ids}} if requested_doc_ids else None
     all_hits: list[RetrievalHit] = []
     seen: set[str] = set()
     queries_to_run = plan if plan else [query]
@@ -184,6 +186,7 @@ async def retrieve_node(state: AgentState) -> dict[str, Any]:
                 query_sparse=sub_sparse,
                 query_colbert_emb=sub_colbert,
                 k=settings.rerank_top_n * 4,
+                where=where,
             )
         else:
             hits = hybrid_query(
@@ -191,6 +194,7 @@ async def retrieve_node(state: AgentState) -> dict[str, Any]:
                 query_sparse=sparse,
                 query_colbert_emb=colbert,
                 k=settings.rerank_top_n * 4,
+                where=where,
             )
         for h in hits:
             if h.chunk_id not in seen:

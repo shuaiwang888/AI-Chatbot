@@ -7,13 +7,14 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.services.persist import persist_status, push_to_hf
+from app.core.auth import require_admin_token
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(require_admin_token)])
 
 
 @router.post("/push")
@@ -31,7 +32,8 @@ async def trigger_push() -> dict:
     from app.services import persist as p
     p._state["pending_push"] = False  # type: ignore[index]
 
-    await push_to_hf()
+    if not await push_to_hf():
+        raise HTTPException(502, "Persistence push failed; inspect /admin/status after retrying.")
 
     new_status = persist_status()
     logger.info("admin/push invoked; status before=%s, after=%s", status, new_status)

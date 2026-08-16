@@ -5,17 +5,18 @@ import json
 import logging
 import uuid
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from langchain_core.messages import HumanMessage, AIMessage
 
 from app.agents.graph import get_compiled_graph
 from app.agents.state import messages_to_lc
+from app.core.auth import require_access_token
 from app.models import db
 from app.models.schemas import SessionCreate, SessionUpdate
-from app.services.persist import push_to_hf
+from app.services.persist import push_to_hf, schedule_push
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/sessions", tags=["sessions"])
+router = APIRouter(prefix="/sessions", tags=["sessions"], dependencies=[Depends(require_access_token)])
 
 
 def _auto_title(content: str, max_chars: int = 30) -> str:
@@ -56,11 +57,13 @@ async def update_session(session_id: str, body: SessionUpdate) -> dict:
         raise HTTPException(404, detail=f"Session {session_id} not found")
 
     new_title = body.title
-    if new_title is not None:
-        # 长度限制, 避免存储过大
-        new_title = new_title.strip()[:200] or None
+    if new_title is None:
+        return {"session": existing}
+    # 长度限制, 避免存储过大
+    new_title = new_title.strip()[:200] or None
 
-    db.session_upsert(session_id, title=new_title)
+    db.session_update_title(session_id, title=new_title)
+    await schedule_push()
     updated = db.session_get(session_id) or {"id": session_id, "title": new_title, "message_count": 0}
     return {"session": updated}
 
@@ -117,8 +120,14 @@ async def delete_session(session_id: str) -> dict:
             "until next successful push or manual cleanup.",
             session_id,
         )
+        await schedule_push()
 
-    return {"session_id": session_id, "deleted": True}
+    return {
+        "session_id": session_id,
+        "deleted": True,
+        "persisted": push_ok,
+        "warning": None if push_ok else "Local deletion succeeded; remote backup retry is pending.",
+    }
 
 
 @router.post("")
@@ -129,4 +138,5 @@ async def create_session(body: SessionCreate) -> dict:
     """
     session_id = uuid.uuid4().hex
     db.session_upsert(session_id, title=body.title)
+    await schedule_push()
     return {"session_id": session_id, "title": body.title}

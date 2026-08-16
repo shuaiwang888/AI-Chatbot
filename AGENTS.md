@@ -603,6 +603,14 @@ function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需
 
 **已部署**: commit `99e6c63` 推 GitHub (`main`). 等 GH Pages 部署即可生效 (后端未变, 不需 HF rebuild).
 
+### 4.13 [全栈] 审计后的权限、持久化与检索一致性修复
+
+**问题**: 公开 Space 的 CORS 不能阻止直接 API 调用；会话创建/重命名和空文档未同步；持久化提交可并发；`marker` fallback 未注册；`doc_ids` 未传入检索；打开 ColBERT 会覆盖 sparse 索引。
+
+**修复**: 增加 fail-closed `API_ACCESS_TOKEN` / `ADMIN_ACCESS_TOKEN`；所有业务 router 加 `X-API-Token`，admin 独立 `X-Admin-Token`；push 加单飞锁；补齐同步与删除反馈；默认 fallback 改 simple 且注册 marker；AgentState 传 document scope；拆分 `chunk_sparse` 与 `chunk_colbert` 并迁移旧行。
+
+**验证**: 前端 build/type-check、后端 compile/pytest 通过后再部署；Space Secrets 必须新增两个令牌。
+
 ---
 
 ## 5. 已建立的工具脚本 (遇到问题先看这里)

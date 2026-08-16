@@ -4,6 +4,8 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app.config import settings
+
 
 class AppError(Exception):
     """应用层业务异常的基类."""
@@ -60,12 +62,14 @@ def install_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(AppError)
     async def _app_error_handler(_: Request, exc: AppError) -> JSONResponse:
+        content = {
+            "code": exc.code,
+            "message": exc.message,
+            "retryable": exc.retryable,
+        }
+        if settings.expose_error_details:
+            content["detail"] = exc.detail
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "code": exc.code,
-                "message": exc.message,
-                "retryable": exc.retryable,
-                "detail": exc.detail,
-            },
+            content=content,
         )

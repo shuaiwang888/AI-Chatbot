@@ -26,6 +26,7 @@ import asyncio
 import concurrent.futures
 import logging
 import shutil
+import tempfile
 import time
 from pathlib import Path
 from typing import Literal
@@ -55,6 +56,12 @@ _persist_executor = concurrent.futures.ThreadPoolExecutor(
 # ✅ 持有后台 task 引用, 避免 asyncio GC 回收未完成的 debounce 任务
 # (曾因为 _state["pending_push"] = True 但 _delayed_push 被 GC, 导致永远卡死)
 _background_tasks: set[asyncio.Task] = set()
+
+# A Dataset snapshot is a read-modify-write operation.  Serialise every caller
+# (chat debounce, upload, delete, shutdown, and admin) to prevent overlapping
+# commits from racing each other or overwriting status state.
+_push_lock: asyncio.Lock | None = None
+_push_lock_loop = None
 
 # debounce 间隔 (秒): 5s 足够让同一秒内的多次写合并, 又不会留太久黑洞窗口
 DEBOUNCE_SECONDS = 5
@@ -94,17 +101,31 @@ async def restore_from_hf() -> None:
     target_subdirs = ["chroma", "colbert", "sqlite", "uploads"]
 
     loop = asyncio.get_running_loop()
+    stage_root = Path(tempfile.mkdtemp(prefix="hf-restore-", dir=str(local_root.parent)))
     try:
         await loop.run_in_executor(
             _persist_executor,
             lambda: snapshot_download(
                 repo_id=repo_id,
                 repo_type="dataset",
-                local_dir=str(local_root),
+                # Restore into a staging directory first. snapshot_download does
+                # not remove local files absent from the remote revision, which
+                # used to let deleted documents survive a cold restore.
+                local_dir=str(stage_root),
                 token=token,
                 allow_patterns=[f"{d}/*" for d in target_subdirs] + target_subdirs,
             ),
         )
+        # The Dataset snapshot is the source of truth after a successful
+        # download. Replace each managed subtree only now, so a network failure
+        # never destroys the local working set.
+        for subdir in target_subdirs:
+            current = local_root / subdir
+            staged = stage_root / subdir
+            if current.exists():
+                shutil.rmtree(current, ignore_errors=True)
+            if staged.exists():
+                shutil.move(str(staged), str(current))
         _state["mode"] = "cold_restore"
         logger.info("Persisted data restored from %s", repo_id)
     except RepositoryNotFoundError:
@@ -118,9 +139,26 @@ async def restore_from_hf() -> None:
         logger.error("Persist restore failed (will start fresh): %s", e, exc_info=True)
         _state["mode"] = "fresh_start"
         _state["last_error"] = f"restore: {type(e).__name__}: {e}"[:500]
+    finally:
+        shutil.rmtree(stage_root, ignore_errors=True)
+
+
+def _get_push_lock() -> asyncio.Lock:
+    global _push_lock, _push_lock_loop
+    loop = asyncio.get_running_loop()
+    if _push_lock is None or _push_lock_loop is not loop:
+        _push_lock = asyncio.Lock()
+        _push_lock_loop = loop
+    return _push_lock
 
 
 async def push_to_hf() -> bool:
+    """Create one serialised, verified snapshot of the local data directory."""
+    async with _get_push_lock():
+        return await _push_to_hf_unlocked()
+
+
+async def _push_to_hf_unlocked() -> bool:
     """同步推送本地数据到 HF Dataset repo. 阻塞, 含 verify.
 
     返回 bool: True=upload + verify 都成功; False=失败 (失败原因在 _state['last_error']).
@@ -212,7 +250,8 @@ async def push_to_hf() -> bool:
         # 等大文件经常被静默丢弃. 如果 verify 显示 has_chroma=False 但本地有,
         # 用 hf_hub 低层 API 一个一个 upload_file 补上 (走 LFS 大文件协议).
         local_chroma = chroma_dir()
-        if local_chroma.exists() and not has_chroma:
+        local_chroma_files = [p for p in local_chroma.rglob("*") if p.is_file()]
+        if local_chroma_files and not has_chroma:
             logger.warning(
                 "upload_folder skipped chroma/ (large files); falling back to per-file upload_file"
             )
@@ -235,7 +274,10 @@ async def push_to_hf() -> bool:
                 _state["last_verify"] = verify_result
                 logger.info("chroma fallback push: has_chroma=%s", has_chroma)
             else:
-                logger.error("chroma fallback push failed (ChromaDB dense won't persist!)")
+                raise RuntimeError("chroma fallback push failed; dense index was not persisted")
+
+        if local_chroma_files and not has_chroma:
+            raise RuntimeError("persist verification failed: remote chroma/ is missing")
 
         _state["last_push_status"] = "ok"
         _state["last_push_at"] = time.time()

@@ -35,6 +35,13 @@ def _register_default() -> None:
         _REGISTRY["simple"] = SimpleParser
     except ImportError as e:
         logger.warning("simple parser not installed: %s", e)
+    try:
+        from app.services.parsers.marker_parser import MarkerParser
+        _REGISTRY["marker"] = MarkerParser
+    except ImportError as e:
+        # Marker is optional; the production default is the always-installed
+        # SimpleParser, so a missing optional dependency must not break fallback.
+        logger.warning("marker not installed: %s", e)
     # Markdown parser — 零依赖, 始终可用
     from app.services.parsers.markdown_parser import MarkdownParser
     _REGISTRY["markdown"] = MarkdownParser

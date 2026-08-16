@@ -148,6 +148,12 @@ export interface IngestResult {
   status: 'ready' | 'duplicate';
 }
 
+export interface DeleteResult {
+  deleted: boolean;
+  persisted: boolean;
+  warning?: string | null;
+}
+
 // ========== Sessions ==========
 export interface SessionMeta {
   id: string;

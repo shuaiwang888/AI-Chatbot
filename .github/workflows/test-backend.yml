@@ -14,7 +14,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: backend
@@ -25,7 +25,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -35,18 +35,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-pip-
 
-      - name: Install (no ML deps for fast CI)
+      - name: Install test runtime
         run: |
-          # 完整依赖太大 CI 跑慢, 装最小集跑 unit tests
-          # 阶段 6 接入完整 RAGAS 后, 单独 workflow
-          pip install -q -r requirements.txt || {
-            echo "::warning::Full install failed, retrying with minimal"
-            pip install -q fastapi 'pydantic>=2.9' pydantic-settings 'uvicorn[standard]' \
-              'python-multipart' httpx sse-starlette python-dotenv \
-              'openai>=1.60' tenacity cachetools 'langgraph>=0.3' 'langchain-core>=0.3' \
-              'pydantic-ai>=0.2' 'langgraph-checkpoint-sqlite>=2.0' 'pytest>=8.0' \
-              'pytest-asyncio>=0.23' reportlab
-          }
+          pip install -q \
+            fastapi 'pydantic>=2.9' pydantic-settings 'uvicorn[standard]' \
+            python-multipart httpx sse-starlette python-dotenv \
+            'openai>=1.60' tenacity cachetools 'langgraph>=0.3' 'langchain-core>=0.3' \
+            'langgraph-checkpoint-sqlite>=2.0' numpy tiktoken pypdf \
+            huggingface_hub pytest pytest-asyncio
 
       - name: AST sanity
         run: |
@@ -72,32 +68,12 @@ jobs:
           python3 -m py_compile $(find app -name "*.py")
           echo "✅ All Python files compile"
 
-      - name: Phase 1 smoke
+      - name: Regression tests
         env:
-          # CI 不要求真实 LLM, 部分用例会 skip
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY || '' }}
+          TESTING: "true"
+          AUTH_REQUIRED: "false"
         run: |
-          python tests/unit/smoke_phase1.py || {
-            echo "::warning::Phase 1 smoke had failures (可能因 CI 缺 ML 依赖)"
-          }
-
-      - name: Phase 2 smoke
-        env:
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY || '' }}
-        run: |
-          pip install -q chromadb FlagEmbedding rank-bm25 2>&1 | tail -3 || true
-          python tests/unit/smoke_phase2.py || {
-            echo "::warning::Phase 2 smoke had failures"
-          }
-
-      - name: Phase 3 smoke
-        env:
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY || '' }}
-        run: |
-          python tests/unit/smoke_phase3.py || {
-            echo "::warning::Phase 3 smoke had failures"
-          }
-        continue-on-error: true
+          pytest -q tests/eval/test_quality_gate.py -k 'not deepeval_e2e'
 
       - name: Upload coverage
         if: always()

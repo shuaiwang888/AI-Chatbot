@@ -68,8 +68,10 @@ try:
         repo_id=REPO_ID,
         repo_type="space",
         token=TOKEN,
-        commit_message="fix: independent persist executor + reset pending_push on failure",
+        commit_message=os.environ.get("HF_DEPLOY_MESSAGE", "deploy: sync backend from source"),
         ignore_patterns=["__pycache__/*", "*.pyc", ".cache/*"],
+        # Keep the Space root aligned with backend/ when files are removed.
+        delete_patterns=["app/*", "Dockerfile", "requirements.txt", "pyproject.toml"],
     )
     print("✅ 上传完成")
 except Exception as e:
@@ -79,5 +81,6 @@ finally:
     shutil.rmtree(STAGE, ignore_errors=True)
 
 print()
-print("🌐 Space 正在 rebuild, 约 5-10 分钟")
-print("   构建日志: https://huggingface.co/spaces/appQQQ/ai-chatbot/logs")
+print("🌐 Space 正在 rebuild. 请在 Build 状态变为 Running 后验证:")
+print(f"   https://huggingface.co/spaces/{REPO_ID}/logs")
+print(f"   https://{REPO_ID.replace('/', '-')}.hf.space/api/v1/healthz")

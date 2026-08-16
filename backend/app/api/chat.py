@@ -19,7 +19,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from langchain_core.messages import HumanMessage
 
@@ -27,6 +27,7 @@ from app.agents.graph import get_compiled_graph
 from app.agents.nodes import answer_node_stream
 from app.agents.state import empty_state_for
 from app.config import settings
+from app.core.auth import require_access_token
 from app.llm.base import LLMMessage
 from app.llm.factory import get_llm
 from app.models import db
@@ -49,7 +50,7 @@ from app.streaming.events import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/chat", tags=["chat"])
+router = APIRouter(prefix="/chat", tags=["chat"], dependencies=[Depends(require_access_token)])
 
 # 持引用防 GC: 后台算 title 的任务可能跑 1-2s, 中间被 GC 会丢更新
 _deferred_tasks: set[asyncio.Task] = set()
@@ -101,14 +102,17 @@ async def chat_stream(req: ChatRequest) -> StreamingResponse:
 async def _agent_event_stream(req: ChatRequest) -> AsyncIterator[str]:
     """驱动 agent + 把过程映射为 AG-UI 事件."""
     queue: asyncio.Queue[tuple[str, dict] | None] = asyncio.Queue(maxsize=256)
+    failed = False
 
     async def emit(event: str, data: dict) -> None:
         await queue.put((event, data))
 
     async def runner() -> None:
+        nonlocal failed
         try:
             await _run_agent(req, emit=emit)
         except Exception as e:  # noqa: BLE001
+            failed = True
             logger.exception("agent runner failed")
             await emit(EV_ERROR, {"code": "agent_failed", "message": str(e), "retryable": True})
         finally:
@@ -134,8 +138,9 @@ async def _agent_event_stream(req: ChatRequest) -> AsyncIterator[str]:
         if not task.done():
             task.cancel()
 
-    # done
-    yield sse_done(total_ms=int((time.time() - started) * 1000))
+    # `error` is terminal too.  Do not emit a contradictory done event after it.
+    if not failed:
+        yield sse_done(total_ms=int((time.time() - started) * 1000))
 
 
 async def _run_agent(
@@ -168,7 +173,11 @@ async def _run_agent(
     history_msgs.append(new_user_msg)
 
     # 3. 初始化 state
-    state = empty_state_for(req.session_id, locale=req.locale)
+    state = empty_state_for(
+        req.session_id,
+        locale=req.locale,
+        requested_doc_ids=list(dict.fromkeys(req.doc_ids or [])),
+    )
     state["messages"] = history_msgs
 
     # 4. 记录 user message 到 SQLite
@@ -207,7 +216,6 @@ async def _run_agent(
     try:
         graph = await get_compiled_graph()
     except Exception as e:  # noqa: BLE001
-        await _emit(EV_ERROR, {"code": "graph_init_failed", "message": str(e)})
         raise
 
     config = {"configurable": {"thread_id": req.session_id}}
@@ -219,7 +227,6 @@ async def _run_agent(
         final_state.update(result)
     except Exception as e:  # noqa: BLE001
         logger.exception("graph.ainvoke failed")
-        await _emit(EV_ERROR, {"code": "graph_failed", "message": str(e)})
         raise
 
     # 6. 推送检索事件

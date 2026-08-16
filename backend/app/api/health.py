@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends
 
 from app.config import settings
+from app.core.auth import require_access_token
 from app.deps import get_llm, persist_status
 from app.models.schemas import HealthStatus
 
@@ -18,15 +19,17 @@ async def healthz() -> HealthStatus:
     """Liveness 探针. 不检查外部依赖, 永远返回 ok (只要进程在)."""
     return HealthStatus(
         status="ok",
-        llm=True,  # 进程在即代表 LLM 单例已建 (或尝试过)
-        persist=persist_status(),
+        llm=True,
+        # Liveness is intentionally public for the container health check; do
+        # not leak Dataset repository names or internal sync state from it.
+        persist={},
         chroma=False,  # 阶段 2 接入
         version=settings.app_version,
     )
 
 
 @router.get("/readyz", response_model=HealthStatus)
-async def readyz(request: Request) -> HealthStatus:
+async def readyz(_: None = Depends(require_access_token)) -> HealthStatus:
     """Readiness 探针. 检查 LLM 实际可达 + Chroma + 持久化模式."""
     llm_ok = False
     try:

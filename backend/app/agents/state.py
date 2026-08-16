@@ -25,6 +25,7 @@ class AgentState(TypedDict, total=False):
     session_id: str
     user_id: str
     locale: str  # "zh" | "en"
+    requested_doc_ids: list[str]  # Empty means search the whole knowledge base.
 
     # ===== 路由 =====
     route_decision: RouteDecision
@@ -58,7 +59,12 @@ class AgentState(TypedDict, total=False):
 
 
 # ========== State helpers ==========
-def empty_state_for(session_id: str, user_id: str = "default", locale: str = "zh") -> AgentState:
+def empty_state_for(
+    session_id: str,
+    user_id: str = "default",
+    locale: str = "zh",
+    requested_doc_ids: list[str] | None = None,
+) -> AgentState:
     from app.config import settings
 
     return AgentState(
@@ -66,6 +72,7 @@ def empty_state_for(session_id: str, user_id: str = "default", locale: str = "zh
         session_id=session_id,
         user_id=user_id,
         locale=locale,
+        requested_doc_ids=requested_doc_ids or [],
         route_decision="retrieve",
         query_rewritten="",
         plan=[],
