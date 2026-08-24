@@ -85,15 +85,15 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
         }
       }}
       className={cn(
-        'group flex w-full cursor-pointer items-start gap-2 rounded-md px-2 py-2 text-left transition',
+        'group relative flex w-full cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-3 text-left transition',
         active
-          ? 'bg-primary/10 text-foreground'
-          : 'text-foreground/85 hover:bg-muted',
+          ? 'border-primary/20 bg-gradient-to-r from-primary/12 to-violet-500/[0.05] text-foreground shadow-[inset_3px_0_0_rgba(59,130,246,.8)]'
+          : 'text-foreground/85 hover:border-white/[0.05] hover:bg-white/[0.035]',
       )}
     >
       <MessageSquare
         className={cn(
-          'mt-0.5 h-3.5 w-3.5 shrink-0',
+          'mt-0.5 h-4 w-4 shrink-0',
           active ? 'text-primary' : 'text-muted-foreground',
         )}
       />
@@ -139,10 +139,10 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
           </div>
         ) : (
           <>
-            <div className="line-clamp-2 break-words text-sm font-medium" title={title}>
+            <div className="line-clamp-2 break-words text-xs font-medium leading-5" title={title}>
               {title}
             </div>
-            <div className="mt-0.5 truncate text-[10px] text-muted-foreground">
+            <div className="mt-1 truncate text-[9px] text-muted-foreground">
               {session.message_count} 条 · {formatRelativeTime(session.updated_at)}
             </div>
           </>

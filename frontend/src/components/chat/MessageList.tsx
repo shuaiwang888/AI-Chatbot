@@ -9,6 +9,7 @@ import { ThinkingPanel } from './ThinkingPanel';
 import { AgentStepTrace } from './AgentStepTrace';
 import { CitationPanel } from './CitationPanel';
 import { useChatStore } from '@/stores/chatStore';
+import { WelcomeDashboard } from './WelcomeDashboard';
 
 // Markdown + syntax highlighting are only needed once a message is rendered.
 const MessageBubble = lazy(() => import('./MessageBubble').then((m) => ({ default: m.MessageBubble })));
@@ -36,22 +37,7 @@ export function MessageList() {
         </div>
       );
     }
-    return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
-        <div className="max-w-md text-center">
-          <div className="mb-3 flex justify-center gap-3 text-3xl">
-            <span title="知识库">📚</span>
-            <span title="Agent">🤖</span>
-            <span title="引用源">💡</span>
-          </div>
-          <p className="text-sm font-medium text-foreground/80">开始提问吧</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            上传 PDF / Word / 图片到左侧 <strong>知识库</strong>,
-            <br />Agent 会基于你的文档回答, 并标注 <strong>引用源</strong>.
-          </p>
-        </div>
-      </div>
-    );
+    return <WelcomeDashboard />;
   }
 
   return (
@@ -65,7 +51,7 @@ export function MessageList() {
       // React.memo, 流式时只有当前那条重渲, 历史 bubble 全部跳过.
       computeItemKey={(_, msg) => msg.id}
       itemContent={(_, msg) => (
-        <div className="mx-auto max-w-3xl space-y-3 px-4 py-3">
+        <div className="mx-auto max-w-4xl space-y-3 px-4 py-4 md:px-8">
           {msg.role !== 'user' && (msg.thinking || msg.agentSteps?.length || msg.retrieval) && (
             <div className="ml-11 space-y-2">
               {msg.thinking && <ThinkingPanel content={msg.thinking} />}

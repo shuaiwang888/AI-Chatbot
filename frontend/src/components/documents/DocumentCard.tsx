@@ -50,7 +50,7 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
     <>
       <Card
         className={cn(
-          'group cursor-pointer border border-border transition-colors hover:border-primary/60',
+          'group cursor-pointer rounded-xl border border-white/[0.07] bg-white/[0.025] shadow-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-white/[0.045]',
           isWorking && 'border-sky-300/60 bg-sky-50/30 dark:bg-sky-950/10',
         )}
         onClick={onCardClick}

@@ -45,6 +45,7 @@ export interface ChatMessage {
 
 interface ChatState {
   sessionId: string;
+  draft: string;
   messages: ChatMessage[];
   isStreaming: boolean;
   currentAssistantId: string | null;  // 正在流式的 assistant 消息 id
@@ -60,6 +61,7 @@ interface ChatState {
 
   // actions
   setSessionId: (id: string) => void;
+  setDraft: (value: string) => void;
   loadSessionMessages: (msgs: SessionMessage[]) => void;
   setLoadingSession: (id: string | null) => void;
   appendUser: (content: string) => string;       // 返回 message id
@@ -173,6 +175,7 @@ export const useChatStore = create<ChatState>()(
 
     return {
     sessionId: '',
+    draft: '',
     messages: [],
     isStreaming: false,
     currentAssistantId: null,
@@ -182,6 +185,7 @@ export const useChatStore = create<ChatState>()(
     showCitations: true,
 
     setSessionId: (id) => set({ sessionId: id }),
+    setDraft: (value) => set({ draft: value }),
     // 不再 wipe messages; 由调用方显式调用 reset() / loadSessionMessages()
 
     setLoadingSession: (id) => set({ loadingSessionId: id }),
@@ -366,7 +370,7 @@ export const useChatStore = create<ChatState>()(
 
     reset: () => {
       _clearTokenBuffer();
-      set({ messages: [], error: null, currentAssistantId: null, isStreaming: false, loadingSessionId: null });
+      set({ messages: [], draft: '', error: null, currentAssistantId: null, isStreaming: false, loadingSessionId: null });
     },
     toggleAgentTrace: () => set((s) => ({ showAgentTrace: !s.showAgentTrace })),
     toggleCitations: () => set((s) => ({ showCitations: !s.showCitations })),

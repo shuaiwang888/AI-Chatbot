@@ -20,7 +20,7 @@
     --border: 232 30% 22%;
     --input: 232 30% 22%;
     --ring: 217 91% 60%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
   }
 
   .dark {
@@ -75,7 +75,14 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
+    overflow: hidden;
+    background-image:
+      linear-gradient(rgba(255,255,255,.012) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.012) 1px, transparent 1px);
+    background-size: 36px 36px;
   }
+  button, [role="button"] { -webkit-tap-highlight-color: transparent; }
+  ::selection { background: hsl(var(--primary) / .3); color: white; }
 }
 
 /* Custom scrollbar */
@@ -103,6 +110,23 @@
 }
 @keyframes blink {
   50% { opacity: 0; }
+}
+
+@keyframes welcome-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.welcome-scroll > div {
+  animation: welcome-in .55s cubic-bezier(.2,.8,.2,1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
 }
 
 /* ========== Markdown 渲染 (assistant 消息) ========== */
@@ -188,25 +212,15 @@
 .prose-chat strong { font-weight: 600; }
 .prose-chat em { font-style: italic; }
 
-/* highlight.js 代码高亮 (github-light 主题简化版) */
-.hljs { color: #24292e; background: transparent; }
-.hljs-comment, .hljs-quote { color: #6a737d; font-style: italic; }
-.hljs-keyword, .hljs-selector-tag, .hljs-section, .hljs-title { color: #d73a49; }
-.hljs-string, .hljs-attr { color: #032f62; }
-.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #005cc5; }
-.hljs-built_in, .hljs-builtin-name { color: #005cc5; }
-.hljs-function, .hljs-title.function_ { color: #6f42c1; }
-.hljs-variable, .hljs-template-variable { color: #e36209; }
-.hljs-tag, .hljs-name { color: #22863a; }
-.hljs-attribute { color: #6f42c1; }
-.hljs-meta { color: #6a737d; }
-.dark .hljs { color: #c9d1d9; }
-.dark .hljs-comment, .dark .hljs-quote { color: #8b949e; }
-.dark .hljs-keyword, .dark .hljs-selector-tag { color: #ff7b72; }
-.dark .hljs-string, .dark .hljs-attr { color: #a5d6ff; }
-.dark .hljs-number, .dark .hljs-literal { color: #79c0ff; }
-.dark .hljs-built_in { color: #79c0ff; }
-.dark .hljs-function, .dark .hljs-title.function_ { color: #d2a8ff; }
-.dark .hljs-variable { color: #ffa657; }
-.dark .hljs-tag, .dark .hljs-name { color: #7ee787; }
-
+/* highlight.js 代码高亮 — 当前产品固定深色主题 */
+.hljs { color: #c9d1d9; background: transparent; }
+.hljs-comment, .hljs-quote { color: #8b949e; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-section, .hljs-title { color: #ff7b72; }
+.hljs-string, .hljs-attr { color: #a5d6ff; }
+.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #79c0ff; }
+.hljs-built_in, .hljs-builtin-name { color: #79c0ff; }
+.hljs-function, .hljs-title.function_ { color: #d2a8ff; }
+.hljs-variable, .hljs-template-variable { color: #ffa657; }
+.hljs-tag, .hljs-name { color: #7ee787; }
+.hljs-attribute { color: #d2a8ff; }
+.hljs-meta { color: #8b949e; }

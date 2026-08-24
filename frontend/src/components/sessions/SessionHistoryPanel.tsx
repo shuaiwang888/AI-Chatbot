@@ -9,9 +9,9 @@
  * - handleSelect 立即清 messages + 设 isStreaming 标志, MessageList 显示 spinner,
  *   给用户"我正在切"的视觉反馈 (之前的 1-3 秒空白期用户会以为没点中).
  */
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus } from 'lucide-react';
+import { History, Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus, Search, X } from 'lucide-react';
 
 import { useChatStore } from '@/stores/chatStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -27,6 +27,7 @@ import { SessionListItem } from './SessionListItem';
 import { cn } from '@/lib/utils';
 
 export function SessionHistoryPanel() {
+  const [query, setQuery] = useState('');
   const open = useUIStore((s) => s.rightSidebarOpen);
   const toggle = useUIStore((s) => s.toggleRightSidebar);
   const sessionId = useChatStore((s) => s.sessionId);
@@ -137,11 +138,16 @@ export function SessionHistoryPanel() {
   );
 
   const sessions = useMemo(() => sortSessions(sessionsQ.data?.sessions), [sessionsQ.data]);
+  const filteredSessions = useMemo(() => {
+    const q = query.trim().toLocaleLowerCase();
+    if (!q) return sessions;
+    return sessions.filter((session) => (session.title?.trim() || 'Untitled chat').toLocaleLowerCase().includes(q));
+  }, [query, sessions]);
 
   if (!open) {
     // 折叠态: 只露一个竖排的展开按钮
     return (
-      <aside className="flex w-12 shrink-0 flex-col items-center border-l bg-muted/20 py-2">
+      <aside className="hidden w-14 shrink-0 flex-col items-center rounded-2xl border border-white/[0.07] bg-white/[0.025] py-2 lg:flex">
         <Button
           size="icon"
           variant="ghost"
@@ -171,12 +177,12 @@ export function SessionHistoryPanel() {
   }
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l bg-muted/20">
+    <aside className="fixed inset-y-0 right-0 z-30 flex w-[min(22rem,88vw)] shrink-0 flex-col border-l border-white/[0.08] bg-[hsl(232_34%_10%/.98)] shadow-2xl backdrop-blur-xl transition duration-300 lg:relative lg:inset-auto lg:z-auto lg:w-[20rem] lg:rounded-2xl lg:border lg:bg-white/[0.025] lg:shadow-none">
       {/* 顶部 */}
-      <div className="flex h-12 shrink-0 items-center justify-between gap-1 border-b px-3">
-        <div className="flex items-center gap-1.5 text-sm font-semibold">
-          <MessageSquareText className="h-4 w-4" />
-          <span>历史对话</span>
+      <div className="flex h-16 shrink-0 items-center justify-between gap-1 border-b border-white/[0.06] px-3">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><History className="h-4 w-4" /></div>
+          <div><span>会话记录</span><p className="mt-0.5 text-[9px] font-normal text-muted-foreground">{sessions.length} conversations</p></div>
         </div>
         <div className="flex items-center gap-0.5">
           <Button
@@ -205,9 +211,21 @@ export function SessionHistoryPanel() {
         </div>
       </div>
 
+      <div className="space-y-3 border-b border-white/[0.06] p-3">
+        <Button className="h-10 w-full justify-center rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white shadow-[0_8px_24px_rgba(59,130,246,.2)] hover:from-blue-400 hover:to-violet-400" onClick={handleNew} disabled={createMut.isPending}>
+          {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+          新建对话
+        </Button>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索会话…" className="h-9 w-full rounded-xl border border-white/[0.07] bg-black/10 pl-9 pr-8 text-xs outline-none transition placeholder:text-muted-foreground/60 focus:border-primary/40" />
+          {query && <button type="button" onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="清除搜索"><X className="h-3.5 w-3.5" /></button>}
+        </div>
+      </div>
+
       {/* 列表 */}
       <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-0.5 p-2">
+        <div className="flex flex-col gap-1 p-2">
           {sessionsQ.isLoading && (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -229,7 +247,10 @@ export function SessionHistoryPanel() {
               </Button>
             </div>
           )}
-          {sessions.map((s) => (
+          {!sessionsQ.isLoading && !sessionsQ.isError && sessions.length > 0 && filteredSessions.length === 0 && (
+            <div className="rounded-xl border border-dashed border-white/[0.07] px-4 py-8 text-center text-xs text-muted-foreground">没有匹配的会话</div>
+          )}
+          {filteredSessions.map((s) => (
             <SessionListItem
               key={s.id}
               session={s}

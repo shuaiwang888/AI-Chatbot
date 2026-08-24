@@ -6,7 +6,7 @@
  * 流式时, 父组件 re-render 不再让所有历史 bubble 跟着重渲染,
  * 只重渲当前 streaming 那个 (props 引用变化的那个).
  */
-import { Bot, User } from 'lucide-react';
+import { Bot, Copy, User } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -37,21 +37,26 @@ function MessageBubbleInner({ message }: { message: ChatMessage }) {
     >
       <div
         className={cn(
-          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-          isUser ? 'bg-muted text-muted-foreground' : 'bg-primary text-primary-foreground',
+          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
+          isUser ? 'border-white/10 bg-white/[0.06] text-muted-foreground' : 'border-primary/20 bg-gradient-to-br from-primary to-violet-500 text-white shadow-[0_8px_24px_rgba(59,130,246,.2)]',
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
       <div
         className={cn(
-          'max-w-[80%] rounded-lg px-4 py-2.5 text-sm leading-relaxed',
+          'group/bubble relative max-w-[84%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
           isUser
-            ? 'bg-primary text-primary-foreground whitespace-pre-wrap'
-            : 'bg-muted text-foreground',
+            ? 'rounded-tr-md border border-primary/20 bg-primary/15 text-foreground whitespace-pre-wrap'
+            : 'rounded-tl-md border border-white/[0.07] bg-white/[0.045] text-foreground shadow-[0_10px_35px_rgba(0,0,0,.12)]',
           message.streaming && 'streaming-cursor',
         )}
       >
+        {!isUser && visibleText && (
+          <button type="button" onClick={() => navigator.clipboard?.writeText(visibleText)} className="absolute -right-1 -top-8 hidden items-center gap-1 rounded-lg border border-white/[0.07] bg-card px-2 py-1 text-[9px] text-muted-foreground shadow-lg transition hover:text-foreground group-hover/bubble:flex" title="复制回答">
+            <Copy className="h-3 w-3" /> 复制
+          </button>
+        )}
         {isUser ? (
           // user 消息保留原样 (通常无 markdown 语法, 但也支持)
           visibleText || (message.streaming ? '' : '(空消息)')

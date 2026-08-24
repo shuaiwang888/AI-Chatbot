@@ -70,18 +70,21 @@ export function UploadPanel() {
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={cn(
-          'rounded-lg border-2 border-dashed p-4 text-center transition-colors',
-          dragOver ? 'border-primary bg-primary/5' : 'border-muted',
+          'rounded-2xl border border-dashed p-4 text-center transition duration-300',
+          dragOver ? 'scale-[1.01] border-primary bg-primary/10' : 'border-white/10 bg-white/[0.025] hover:border-primary/30 hover:bg-white/[0.04]',
         )}
       >
-        <Upload className="mx-auto mb-1.5 h-6 w-6 text-muted-foreground" />
-        <p className="text-xs text-muted-foreground">
-          拖拽文件到这里, 或
+        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-blue-300">
+          <Upload className="h-5 w-5" />
+        </div>
+        <p className="text-xs font-medium text-foreground">
+          拖入资料开始构建知识
         </p>
+        <p className="mt-1 text-[10px] text-muted-foreground">系统会自动解析、分块和建立索引</p>
         <Button
           size="sm"
           variant="outline"
-          className="mt-2"
+          className="mt-3 rounded-lg border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
           onClick={() => inputRef.current?.click()}
           disabled={upload.isPending}
         >
@@ -90,7 +93,7 @@ export function UploadPanel() {
           ) : (
             <FileUp className="mr-1.5 h-3.5 w-3.5" />
           )}
-          选择文件
+          浏览文件
         </Button>
         <input
           ref={inputRef}

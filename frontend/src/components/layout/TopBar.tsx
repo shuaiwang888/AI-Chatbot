@@ -1,7 +1,7 @@
 /**
  * 顶部栏: 标题 + 状态指示 + 侧栏切换按钮.
  */
-import { Activity, Cpu, Database, KeyRound, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Sparkles, Wifi, WifiOff } from 'lucide-react';
+import { Activity, Bot, Command, Cpu, Database, KeyRound, Menu, PanelRightClose, PanelRightOpen, Sparkles, Wifi, WifiOff } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { healthApi } from '@/lib/api';
 import { useUIStore } from '@/stores/uiStore';
@@ -24,6 +24,8 @@ export function TopBar() {
   const toggleRight = useUIStore((s) => s.toggleRightSidebar);
   const showFluid = useUIStore((s) => s.showFluidBackground);
   const toggleFluid = useUIStore((s) => s.toggleFluidBackground);
+  const setSidebar = useUIStore((s) => s.setSidebar);
+  const setRight = useUIStore((s) => s.setRightSidebar);
 
   const handleAccessToken = () => {
     const current = getAccessToken();
@@ -41,16 +43,34 @@ export function TopBar() {
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
 
   return (
-    <header className="flex h-14 min-w-0 shrink-0 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="relative z-10 flex h-16 min-w-0 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-background/75 px-3 backdrop-blur-xl md:px-5">
       {/* 左侧 logo + title. min-w-0 让标题区可压缩, 不会撑爆 TopBar */}
-      <div className="flex min-w-0 shrink items-center gap-2">
-        <div className="shrink-0 text-xl">🤖</div>
+      <Button
+        size="icon"
+        variant="ghost"
+        onClick={() => { setRight(false); setSidebar(!sidebarOpen); }}
+        title="打开知识库"
+        className="shrink-0 lg:hidden"
+      >
+        <Menu className="h-4 w-4" />
+      </Button>
+      <div className="flex min-w-0 shrink items-center gap-2.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-gradient-to-br from-blue-500 to-violet-600 text-white shadow-[0_8px_28px_rgba(59,130,246,.3)]">
+          <Bot className="h-4 w-4" />
+        </div>
         <div className="min-w-0">
-          <h1 className="truncate text-sm font-semibold leading-none">AI Chatbot</h1>
-          <p className="truncate text-[10px] text-muted-foreground">
-            私人 Agent 智能客服 · v{health?.version || '...'}
+          <h1 className="truncate text-sm font-semibold leading-none tracking-tight">NEXUS Agent</h1>
+          <p className="mt-1 truncate text-[9px] uppercase tracking-[0.14em] text-muted-foreground">
+            Private knowledge intelligence
           </p>
         </div>
+      </div>
+
+      <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-[10px] text-muted-foreground xl:flex">
+        <Command className="h-3.5 w-3.5" />
+        <span>知识工作台</span>
+        <span className="h-1 w-1 rounded-full bg-border" />
+        <span>v{health?.version || '...'}</span>
       </div>
 
       {/* 右侧状态 + 切换. shrink-0 保证不被挤压, ml-auto 推到右边 */}
@@ -107,20 +127,13 @@ export function TopBar() {
         >
           <Sparkles className="h-4 w-4" />
         </Button>
-        <Button
-          size="icon"
-          variant="ghost"
-          onClick={toggleSidebar}
-          title={sidebarOpen ? '折叠左侧' : '展开左侧'}
-          aria-label="切换左侧栏"
-          className="shrink-0"
-        >
-          {sidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+        <Button size="icon" variant="ghost" onClick={toggleSidebar} title={sidebarOpen ? '折叠知识库' : '展开知识库'} aria-label="切换知识库" className="hidden shrink-0 lg:inline-flex">
+          <Database className="h-4 w-4" />
         </Button>
         <Button
           size="icon"
           variant="ghost"
-          onClick={toggleRight}
+          onClick={() => { if (window.matchMedia('(max-width: 1023px)').matches) setSidebar(false); toggleRight(); }}
           title={rightOpen ? '折叠历史对话' : '展开历史对话'}
           aria-label="切换历史对话栏"
           className="shrink-0"
