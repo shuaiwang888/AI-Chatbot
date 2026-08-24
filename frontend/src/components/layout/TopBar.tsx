@@ -41,6 +41,7 @@ export function TopBar() {
 
   const online = !isError && health?.llm;
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
+  const hasAccessToken = Boolean(getAccessToken());
 
   return (
     <header className="relative z-10 flex h-16 min-w-0 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-background/75 px-3 backdrop-blur-xl md:px-5">
@@ -75,7 +76,11 @@ export function TopBar() {
 
       {/* 右侧状态 + 切换. shrink-0 保证不被挤压, ml-auto 推到右边 */}
       <div className="ml-auto flex shrink-0 items-center gap-1.5 text-xs">
-        {isLoading ? (
+        {!hasAccessToken ? (
+          <Badge variant="warning" className="hidden gap-1 sm:inline-flex" title="点击右侧钥匙按钮设置访问令牌">
+            <KeyRound className="h-3 w-3" /> 需要令牌
+          </Badge>
+        ) : isLoading ? (
           <Badge variant="secondary">检查中…</Badge>
         ) : isError || !online ? (
           <Badge variant="destructive" className="hidden gap-1 sm:inline-flex">
@@ -109,9 +114,9 @@ export function TopBar() {
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
         <Button
           size="icon"
-          variant={getAccessToken() ? 'secondary' : 'ghost'}
+          variant={hasAccessToken ? 'secondary' : 'ghost'}
           onClick={handleAccessToken}
-          title={getAccessToken() ? '更新或清除访问令牌' : '设置访问令牌'}
+          title={hasAccessToken ? '更新或清除访问令牌' : '设置访问令牌'}
           aria-label="设置访问令牌"
           className="shrink-0"
         >
