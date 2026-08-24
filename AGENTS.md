@@ -611,6 +611,26 @@ function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需
 
 **验证**: 前端 build/type-check、后端 compile/pytest 通过后再部署；Space Secrets 必须新增两个令牌。
 
+### 4.14 [前端] 知识工作台重构与鉴权状态交互
+
+**症状**: 原页面欢迎态过于空白，知识库与会话缺少搜索和状态概览；启用 fail-closed 鉴权后，无令牌浏览器会持续请求受保护接口、反复产生 401，并把“缺少令牌”误报为“后端离线”。
+
+**根因**: 欢迎态、健康状态和数据查询没有区分“未配置前端令牌”“服务不可用”“数据为空”三种状态；文档和会话 Query 在令牌缺失时仍自动轮询。
+
+**修复**: 重构为 NEXUS 三栏知识工作台，增加任务快捷卡、增强输入器、文件/会话搜索、移动端抽屉和状态统计；无令牌时暂停 health/documents/sessions 查询及上传/新建操作，统一引导用户点击右上角钥匙按钮。
+
+**验证**: TypeScript、Vite build、桌面/390px Playwright、模拟数据关键路径均通过；生产匿名页面 0 console error、0 受保护 API 请求；提交范围见 `4218ad4`、`119018b`、`d114bb4`、`dcc73f1`。
+
+### 4.15 [CI/部署] 后端 CI 误报与 Space 版本滞后
+
+**症状**: `16d93f6` 的后端 GitHub Actions 中 7 个测试全部报 `No module named app`；HF Space 仍运行 6 月旧 SHA，业务接口可匿名访问，未包含仓库中的安全修复。
+
+**根因**: CI 直接调用虚拟环境的 `pytest` 控制台脚本，`backend/` 未进入 `sys.path`；GitHub → HF mirror 没有同步新版后端；Space 缺少新增鉴权 Secrets。
+
+**修复**: CI 改用 `python3 -m pytest`（提交 `18230f6`）；生成独立的 API/Admin 令牌并写入 HF Space Secrets，同时保存于本机 macOS 钥匙串；使用 `deploy-via-api.py` 全量同步当前 `backend/`。
+
+**验证**: GitHub 后端 CI 成功；HF runtime/repo SHA 一致；匿名 readyz/documents 均 401；授权 readyz 显示 LLM、Chroma、cold_restore 正常且 `last_error=null`；生产 RAG 问答返回非空答案和 5 条引用，测试会话删除并成功持久化。
+
 ---
 
 ## 5. 已建立的工具脚本 (遇到问题先看这里)
@@ -645,6 +665,8 @@ python3 scripts/deploy-via-api.py
 - `HF_TOKEN` — 写权限 HF token, 推 Space / Dataset 用
 - `backend/.env` — 在 `.gitignore` 里, 不入仓
 - HF Space 端: Settings → Secrets 设 `HF_TOKEN`, `MINIMAX_API_KEY` 等
+- 业务鉴权: HF Space Secrets 必须设 `API_ACCESS_TOKEN`、`ADMIN_ACCESS_TOKEN`
+- 本机部署令牌存于 macOS 钥匙串 service `AI-Chatbot-API-Access` / `AI-Chatbot-Admin-Access`，不要复制进仓库
 - GH Actions 端: Settings → Secrets → Actions 设 `VITE_API_BASE` 等
 - 部署时绝对不要 `echo $HF_TOKEN > file` 或粘到 chat 记录
 
@@ -693,9 +715,7 @@ unset HF_TOKEN           # 用完清掉
 |---|---|---|
 | HF git mirror 不稳定 | push 完偶尔不自动 rebuild, 需手动推 | 已有 workaround (push-single-file.py); 可考虑把 deploy 自动化加到 GH Actions |
 | 没 light mode toggle | 当前 `:root` 直接是深紫蓝, 没法切回 light | 加 toggle: `uiStore.theme` 已有, 补上 `document.documentElement.classList.toggle('dark')` 即可 |
-| 单用户, 无鉴权 | CORS 任何人能调 | 项目定位是个人用, 暂不处理 |
 | `_push_chroma_fallback` | 用 upload_file 单文件推, 当 upload_folder 撞 LFS 限速时用 | 已就绪, 不需修 |
-| `marker` parser 引用但未注册 | Literal 里写了 marker, _REGISTRY 没注册 | 不影响 (生产用 docling + simple), 但代码上是个小坑 |
 | `feishu/lark 文档` 摄入 | docling 应该能解析, 没单独测试 | 按需扩展 |
 
 ---
@@ -718,5 +738,5 @@ unset HF_TOKEN           # 用完清掉
 
 ---
 
-> 最后更新: 本 session (2026-06-25)
+> 最后更新: 本 session (2026-08-24)
 > 维护者: shuaiwang
