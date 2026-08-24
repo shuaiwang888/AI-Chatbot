@@ -13,6 +13,7 @@ import { useDocuments, summarizeDocs } from '@/hooks/useDocuments';
 import { useChatStore } from '@/stores/chatStore';
 import { useUIStore } from '@/stores/uiStore';
 import { cn } from '@/lib/utils';
+import { getAccessToken } from '@/lib/auth';
 
 const STARTERS = [
   {
@@ -54,6 +55,16 @@ export function WelcomeDashboard() {
   const setSidebar = useUIStore((s) => s.setSidebar);
   const docsQ = useDocuments();
   const summary = summarizeDocs(docsQ.data?.documents);
+  const hasAccessToken = Boolean(getAccessToken());
+  const serviceState = docsQ.isLoading
+    ? { label: '正在检查知识服务', dot: 'bg-amber-400', ping: false }
+    : docsQ.isError
+      ? {
+          label: hasAccessToken ? '知识服务暂不可用' : '请先设置访问令牌',
+          dot: 'bg-amber-400',
+          ping: false,
+        }
+      : { label: 'Knowledge Agent 已准备就绪', dot: 'bg-emerald-400', ping: true };
 
   const choosePrompt = (prompt: string) => {
     setDraft(prompt);
@@ -66,10 +77,10 @@ export function WelcomeDashboard() {
         <div className="mb-8 max-w-3xl">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-medium text-blue-200 shadow-[0_0_30px_rgba(59,130,246,.12)]">
             <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+              {serviceState.ping && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />}
+              <span className={cn('relative inline-flex h-2 w-2 rounded-full', serviceState.dot)} />
             </span>
-            Knowledge Agent 已准备就绪
+            {serviceState.label}
           </div>
 
           <div className="flex items-start gap-4">
@@ -116,7 +127,11 @@ export function WelcomeDashboard() {
             </div>
             <div>
               <p className="text-xs font-medium text-foreground">
-                {docsQ.isLoading ? '正在连接知识库…' : summary.ready > 0 ? `${summary.ready} 份资料可用于回答` : '知识库还是空的'}
+                {docsQ.isLoading
+                  ? '正在连接知识库…'
+                  : docsQ.isError
+                    ? hasAccessToken ? '知识服务连接失败' : '输入访问令牌后读取知识库'
+                    : summary.ready > 0 ? `${summary.ready} 份资料可用于回答` : '知识库还是空的'}
               </p>
               <p className="mt-0.5 text-[10px] text-muted-foreground">
                 {summary.inProgress > 0 ? `${summary.inProgress} 份资料正在解析` : '支持 PDF、Office、Markdown 与图片'}
@@ -129,7 +144,7 @@ export function WelcomeDashboard() {
             className="inline-flex items-center gap-1.5 self-start rounded-lg px-2 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/10 sm:self-auto"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            {summary.total > 0 ? '管理知识库' : '上传第一份资料'}
+            {docsQ.isError ? '查看连接状态' : summary.total > 0 ? '管理知识库' : '上传第一份资料'}
           </button>
         </div>
 
