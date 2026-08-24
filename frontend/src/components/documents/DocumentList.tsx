@@ -2,20 +2,32 @@
  * 文档列表. 用 TanStack Query 轮询, 自动反映摄入状态.
  */
 import { useMemo, useState } from 'react';
-import { FileSearch, Loader2, Search, X } from 'lucide-react';
+import { FileSearch, KeyRound, Loader2, Search, X } from 'lucide-react';
 import { useDocuments, summarizeDocs } from '@/hooks/useDocuments';
 import { DocumentCard } from './DocumentCard';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { getAccessToken } from '@/lib/auth';
 
 export function DocumentList() {
   const [query, setQuery] = useState('');
   const { data, isLoading, isError } = useDocuments();
   const summary = summarizeDocs(data?.documents);
+  const hasAccessToken = Boolean(getAccessToken());
   const filtered = useMemo(() => {
     const q = query.trim().toLocaleLowerCase();
     if (!q) return data?.documents ?? [];
     return (data?.documents ?? []).filter((doc) => doc.filename.toLocaleLowerCase().includes(q));
   }, [data?.documents, query]);
+
+  if (!hasAccessToken) {
+    return (
+      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-amber-500/20 bg-amber-500/[0.04] px-4 py-6 text-center text-amber-200">
+        <KeyRound className="mb-2 h-5 w-5" />
+        <p className="text-xs font-medium">需要访问令牌</p>
+        <p className="mt-1 text-[10px] text-muted-foreground">点击页面右上角钥匙按钮设置</p>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { documentsApi, ApiError } from '@/lib/api';
 import type { DocumentMeta } from '@/types';
+import { getAccessToken } from '@/lib/auth';
 
 const KEY = ['documents'] as const;
 
@@ -14,6 +15,7 @@ export function useDocuments() {
     queryFn: () => documentsApi.list({ limit: 100 }),
     refetchInterval: 5000, // 摄入中状态需要轮询
     staleTime: 2000,
+    enabled: Boolean(getAccessToken()),
   });
 }
 

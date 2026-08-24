@@ -6,6 +6,7 @@ import { Upload, FileUp, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUploadDocument } from '@/hooks/useDocuments';
 import { cn, formatBytes } from '@/lib/utils';
+import { getAccessToken } from '@/lib/auth';
 
 export function UploadPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -17,6 +18,7 @@ export function UploadPanel() {
     error?: string;
   } | null>(null);
   const upload = useUploadDocument();
+  const hasAccessToken = Boolean(getAccessToken());
 
   const handleFile = useCallback(
     async (file: File) => {
@@ -54,10 +56,11 @@ export function UploadPanel() {
     (e: React.DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setDragOver(false);
+      if (!hasAccessToken) return;
       const files = Array.from(e.dataTransfer.files);
       files.forEach(handleFile);
     },
-    [handleFile],
+    [handleFile, hasAccessToken],
   );
 
   return (
@@ -86,7 +89,7 @@ export function UploadPanel() {
           variant="outline"
           className="mt-3 rounded-lg border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
           onClick={() => inputRef.current?.click()}
-          disabled={upload.isPending}
+          disabled={!hasAccessToken || upload.isPending}
         >
           {upload.isPending ? (
             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
@@ -101,6 +104,7 @@ export function UploadPanel() {
           className="hidden"
           accept=".pdf,.docx,.pptx,.xlsx,.png,.jpg,.jpeg,.tiff,.html,.md,.markdown"
           multiple
+          disabled={!hasAccessToken}
           onChange={(e) => {
             const files = Array.from(e.target.files || []);
             files.forEach(handleFile);
@@ -108,7 +112,7 @@ export function UploadPanel() {
           }}
         />
         <p className="mt-2 text-[10px] text-muted-foreground">
-          PDF / Word / PPT / Excel / Markdown / 图片, ≤ 50MB
+          {hasAccessToken ? 'PDF / Word / PPT / Excel / Markdown / 图片, ≤ 50MB' : '请先通过右上角钥匙按钮设置访问令牌'}
         </p>
       </div>
 

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { sessionsApi, ApiError } from '@/lib/api';
 import type { SessionDetail, SessionMeta } from '@/types';
+import { getAccessToken } from '@/lib/auth';
 
 const KEY = ['sessions'] as const;
 
@@ -14,6 +15,7 @@ export function useSessions(limit = 50) {
     queryFn: () => sessionsApi.list({ limit }),
     refetchInterval: 30_000, // 30s 轮询, 看到新会话
     staleTime: 5_000,
+    enabled: Boolean(getAccessToken()),
   });
 }
 

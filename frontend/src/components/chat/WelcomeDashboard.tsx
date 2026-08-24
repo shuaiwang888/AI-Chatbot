@@ -56,11 +56,13 @@ export function WelcomeDashboard() {
   const docsQ = useDocuments();
   const summary = summarizeDocs(docsQ.data?.documents);
   const hasAccessToken = Boolean(getAccessToken());
-  const serviceState = docsQ.isLoading
-    ? { label: '正在检查知识服务', dot: 'bg-amber-400', ping: false }
-    : docsQ.isError
+  const serviceState = !hasAccessToken
+    ? { label: '请先设置访问令牌', dot: 'bg-amber-400', ping: false }
+    : docsQ.isLoading
+      ? { label: '正在检查知识服务', dot: 'bg-amber-400', ping: false }
+      : docsQ.isError
       ? {
-          label: hasAccessToken ? '知识服务暂不可用' : '请先设置访问令牌',
+          label: '知识服务暂不可用',
           dot: 'bg-amber-400',
           ping: false,
         }
@@ -127,10 +129,12 @@ export function WelcomeDashboard() {
             </div>
             <div>
               <p className="text-xs font-medium text-foreground">
-                {docsQ.isLoading
+                {!hasAccessToken
+                  ? '输入访问令牌后读取知识库'
+                  : docsQ.isLoading
                   ? '正在连接知识库…'
                   : docsQ.isError
-                    ? hasAccessToken ? '知识服务连接失败' : '输入访问令牌后读取知识库'
+                    ? '知识服务连接失败'
                     : summary.ready > 0 ? `${summary.ready} 份资料可用于回答` : '知识库还是空的'}
               </p>
               <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -144,7 +148,7 @@ export function WelcomeDashboard() {
             className="inline-flex items-center gap-1.5 self-start rounded-lg px-2 py-1.5 text-xs font-medium text-primary transition hover:bg-primary/10 sm:self-auto"
           >
             <Sparkles className="h-3.5 w-3.5" />
-            {docsQ.isError ? '查看连接状态' : summary.total > 0 ? '管理知识库' : '上传第一份资料'}
+            {!hasAccessToken || docsQ.isError ? '查看连接状态' : summary.total > 0 ? '管理知识库' : '上传第一份资料'}
           </button>
         </div>
 

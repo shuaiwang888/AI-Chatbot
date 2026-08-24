@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { History, Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus, Search, X } from 'lucide-react';
+import { History, KeyRound, Loader2, MessageSquareText, PanelRightClose, PanelRightOpen, Plus, Search, X } from 'lucide-react';
 
 import { useChatStore } from '@/stores/chatStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -25,9 +25,11 @@ import {
 } from '@/hooks/useSessions';
 import { SessionListItem } from './SessionListItem';
 import { cn } from '@/lib/utils';
+import { getAccessToken } from '@/lib/auth';
 
 export function SessionHistoryPanel() {
   const [query, setQuery] = useState('');
+  const hasAccessToken = Boolean(getAccessToken());
   const open = useUIStore((s) => s.rightSidebarOpen);
   const toggle = useUIStore((s) => s.toggleRightSidebar);
   const sessionId = useChatStore((s) => s.sessionId);
@@ -75,6 +77,7 @@ export function SessionHistoryPanel() {
   const autoCreatedRef = useRef(false);
   useEffect(() => {
     if (autoCreatedRef.current) return;
+    if (!hasAccessToken) return;
     if (sessionId) return;            // 已有 session, 不动
     if (createMut.isPending) return;  // 已经在建, 等它完成
 
@@ -164,7 +167,7 @@ export function SessionHistoryPanel() {
           onClick={handleNew}
           title="新对话"
           aria-label="新对话"
-          disabled={createMut.isPending}
+        disabled={!hasAccessToken || createMut.isPending}
         >
           {createMut.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -191,7 +194,7 @@ export function SessionHistoryPanel() {
             onClick={handleNew}
             title="新对话"
             aria-label="新对话"
-            disabled={createMut.isPending}
+            disabled={!hasAccessToken || createMut.isPending}
           >
             {createMut.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -212,7 +215,7 @@ export function SessionHistoryPanel() {
       </div>
 
       <div className="space-y-3 border-b border-white/[0.06] p-3">
-        <Button className="h-10 w-full justify-center rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white shadow-[0_8px_24px_rgba(59,130,246,.2)] hover:from-blue-400 hover:to-violet-400" onClick={handleNew} disabled={createMut.isPending}>
+        <Button className="h-10 w-full justify-center rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white shadow-[0_8px_24px_rgba(59,130,246,.2)] hover:from-blue-400 hover:to-violet-400" onClick={handleNew} disabled={!hasAccessToken || createMut.isPending}>
           {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           新建对话
         </Button>
@@ -226,18 +229,25 @@ export function SessionHistoryPanel() {
       {/* 列表 */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-1 p-2">
-          {sessionsQ.isLoading && (
+          {!hasAccessToken && (
+            <div className="flex flex-col items-center rounded-xl border border-dashed border-amber-500/20 bg-amber-500/[0.04] px-4 py-8 text-center">
+              <KeyRound className="mb-2 h-5 w-5 text-amber-300" />
+              <p className="text-xs font-medium text-amber-200">设置令牌后查看会话</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">点击页面右上角钥匙按钮</p>
+            </div>
+          )}
+          {hasAccessToken && sessionsQ.isLoading && (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               加载中…
             </div>
           )}
-          {sessionsQ.isError && (
+          {hasAccessToken && sessionsQ.isError && (
             <div className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
               加载失败: {(sessionsQ.error as Error)?.message}
             </div>
           )}
-          {!sessionsQ.isLoading && !sessionsQ.isError && sessions.length === 0 && (
+          {hasAccessToken && !sessionsQ.isLoading && !sessionsQ.isError && sessions.length === 0 && (
             <div className="flex flex-col items-center justify-center px-4 py-12 text-center text-sm text-muted-foreground">
               <MessageSquareText className="mb-2 h-8 w-8 opacity-30" />
               <div className="mb-3">还没有对话</div>

@@ -11,11 +11,13 @@ import { cn } from '@/lib/utils';
 import { clearAccessToken, getAccessToken, setAccessToken } from '@/lib/auth';
 
 export function TopBar() {
+  const hasAccessToken = Boolean(getAccessToken());
   const { data: health, isError, isLoading } = useQuery({
     queryKey: ['health', 'readyz'],
     queryFn: () => healthApi.readiness(),
     refetchInterval: 10000,
     retry: 0,
+    enabled: hasAccessToken,
   });
 
   const sidebarOpen = useUIStore((s) => s.sidebarOpen);
@@ -41,7 +43,6 @@ export function TopBar() {
 
   const online = !isError && health?.llm;
   const persistOn = health?.persist?.enabled && health?.persist?.mode !== 'disabled';
-  const hasAccessToken = Boolean(getAccessToken());
 
   return (
     <header className="relative z-10 flex h-16 min-w-0 shrink-0 items-center gap-3 border-b border-white/[0.06] bg-background/75 px-3 backdrop-blur-xl md:px-5">
