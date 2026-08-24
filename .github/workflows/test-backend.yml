@@ -73,7 +73,10 @@ jobs:
           TESTING: "true"
           AUTH_REQUIRED: "false"
         run: |
-          pytest -q tests/eval/test_quality_gate.py -k 'not deepeval_e2e'
+          # Use the interpreter module entrypoint so the backend working directory
+          # stays on sys.path. The pytest console script can otherwise resolve from
+          # its bin directory and fail every import with "No module named app".
+          python3 -m pytest -q tests/eval/test_quality_gate.py -k 'not deepeval_e2e'
 
       - name: Upload coverage
         if: always()
