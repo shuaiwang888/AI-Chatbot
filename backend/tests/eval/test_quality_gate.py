@@ -212,6 +212,41 @@ def test_answer_prompt_requires_semantic_markdown_hierarchy():
     assert "## 参考来源" in ANSWER_PROMPT
 
 
+def test_cpu_default_skips_cross_encoder_reranker(monkeypatch):
+    """免费 CPU 默认不能把几十秒的 CrossEncoder 放在每次问答热路径。"""
+    from app.agents import nodes
+    from app.services.vector_store import RetrievalHit
+
+    hit = RetrievalHit(
+        chunk_id="chunk-1",
+        doc_id="doc-1",
+        text="与问题相关的内容",
+        score=0.03,
+        page_no=1,
+        heading="测试",
+        context_prefix=None,
+        meta={},
+        dense_score=0.72,
+    )
+
+    monkeypatch.setattr(nodes.settings, "enable_reranker", False)
+    monkeypatch.setattr(nodes, "_doc_meta_brief", lambda _doc_id: {"filename": "test.md"})
+    monkeypatch.setattr(
+        nodes,
+        "get_reranker_service",
+        lambda: (_ for _ in ()).throw(AssertionError("CPU fallback must not load reranker")),
+    )
+
+    result = asyncio.run(nodes.rerank_node({
+        "retrieved": [hit],
+        "query_rewritten": "测试问题",
+    }))
+
+    assert result["reranked"] == [hit]
+    assert result["relevance_verdict"] == "relevant"
+    assert result["citations"][0]["score"] == 0.72
+
+
 # ========== 端到端 (用 deepeval) ==========
 def test_deepeval_e2e():
     """DeepEval 端到端: 摄入 → 检索 → 回答 → 4 个指标.

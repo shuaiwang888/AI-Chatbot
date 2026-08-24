@@ -213,15 +213,24 @@ async def retrieve_node(state: AgentState) -> dict[str, Any]:
 
 # ========== Node 4: rerank ==========
 async def rerank_node(state: AgentState) -> dict[str, Any]:
-    """BGE-reranker 精排 top-N + 产出引用."""
+    """可选 CrossEncoder 精排；CPU 默认沿用混合检索排序并产出引用。"""
     started = time.time()
     hits = state.get("retrieved") or []
     query = state.get("query_rewritten") or _last_user_query(state)
     if not hits:
         return {"reranked": [], "citations": [], "relevance_score": 0.0, "relevance_verdict": "irrelevant"}
 
-    reranker = get_reranker_service()
-    reranked = await reranker.rerank(query, hits, top_n=settings.rerank_top_n)
+    if settings.enable_reranker:
+        reranker = get_reranker_service()
+        reranked = await reranker.rerank(query, hits, top_n=settings.rerank_top_n)
+    else:
+        # BGE-M3 dense + sparse 已在 hybrid_query 中完成 RRF 排序。免费 CPU Space
+        # 上再跑 CrossEncoder 实测会额外阻塞约 73 秒；直接取 top-N，并用保留下来的
+        # dense cosine 作为可解释的相关性分数。GPU 部署可通过环境变量恢复精排。
+        reranked = list(hits[: settings.rerank_top_n])
+        for rank, hit in enumerate(reranked):
+            hit.original_rank = rank
+            hit.rerank_score = max(0.0, min(1.0, float(hit.dense_score)))
 
     # 构造引用 (前 5 个, 按 rerank 分数)
     citations: list[dict[str, Any]] = []
@@ -238,7 +247,12 @@ async def rerank_node(state: AgentState) -> dict[str, Any]:
         })
 
     top_score = reranked[0].rerank_score if reranked else 0.0
-    if top_score >= settings.crag_relevance_threshold:
+    relevance_threshold = (
+        settings.crag_relevance_threshold
+        if settings.enable_reranker
+        else settings.hybrid_relevance_threshold
+    )
+    if top_score >= relevance_threshold:
         verdict = "relevant"
     elif top_score < 0.3:
         verdict = "irrelevant"

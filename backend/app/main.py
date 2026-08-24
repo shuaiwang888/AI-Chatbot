@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:  # noqa: BLE001
         logger.warning("ChromaDB init failed (will retry on first request): %s", e)
 
-    # BGE-M3 & Reranker 预热.
+    # BGE-M3 & 可选 Reranker 预热.
     # 必须在主线程 *同步* 执行, 不能 run_in_executor 异步跑 — 因为 FlagEmbedding
     # 在 torch 2.2 + transformers 4.57 组合下, 子线程首次 .to(device) 会撞 meta tensor
     # 错 "Cannot copy out of meta tensor; no data!"; 必须等它 meta→cpu 转移完再 await
@@ -66,7 +66,8 @@ async def lifespan(app: FastAPI):
     if settings.embedding_model and not os.environ.get("TESTING"):
         try:
             warm_embedder()
-            warm_reranker()
+            if settings.enable_reranker:
+                warm_reranker()
         except Exception as e:  # noqa: BLE001
             logger.warning("Embedder/reranker warm-up failed: %s", e)
 

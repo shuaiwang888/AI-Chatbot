@@ -61,12 +61,15 @@ class Settings(BaseSettings):
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
     embedding_device: Literal["cpu", "cuda", "mps"] = "cpu"
     use_fp16: bool = True
+    # HF 免费 CPU 上对 20 个候选做 CrossEncoder 重排实测约 73 秒。
+    # 默认使用 BGE-M3 dense+sparse 混合排序；GPU Space 可设 ENABLE_RERANKER=true。
+    enable_reranker: bool = False
 
     # ========== 向量库 / ChromaDB ==========
     chroma_persist_dir: str = "./data/chroma"
     chroma_collection: str = "docs"
     # ⚡ A 改良版: 默认关闭 ColBERT. 三路融合 (dense+sparse+colbert) 每次查询
-    # 多扫 30 个 .npy 文件 + matmul, 0.3-1.5s 开销. 召回率轻微降, reranker 兜底.
+    # 多扫 30 个 .npy 文件 + matmul, 0.3-1.5s 开销. 默认保留 dense+sparse 双路融合.
     # 想恢复三路融合, 设环境变量 ENABLE_COLBERT=true.
     enable_colbert: bool = False
 
@@ -97,6 +100,7 @@ class Settings(BaseSettings):
     rerank_top_n: int = 5
     crag_max_iterations: int = 2
     crag_relevance_threshold: float = 0.7
+    hybrid_relevance_threshold: float = 0.45
 
     # ========== LLM 缓存 ==========
     llm_cache_enabled: bool = True

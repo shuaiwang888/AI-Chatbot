@@ -371,6 +371,9 @@ def hybrid_query(
 
     # RRF 融合
     fused = rrf_fuse(dense, sparse, colbert_ranked, k=60)[:k]
+    dense_scores = {cid: score for cid, score, _payload in dense}
+    sparse_scores_by_id = {cid: score for cid, score, _payload in sparse}
+    colbert_scores = {cid: score for cid, score, _payload in colbert_ranked}
 
     # 构造 RetrievalHit
     hits: list[RetrievalHit] = []
@@ -385,6 +388,9 @@ def hybrid_query(
             heading=meta.get("heading"),
             context_prefix=meta.get("context_prefix"),
             meta=meta,
+            dense_score=float(dense_scores.get(cid, 0.0)),
+            sparse_score=float(sparse_scores_by_id.get(cid, 0.0)),
+            colbert_score=float(colbert_scores.get(cid, 0.0)),
         ))
 
     logger.debug("hybrid_query returned %d hits in %dms", len(hits), int((time.time() - started) * 1000))
