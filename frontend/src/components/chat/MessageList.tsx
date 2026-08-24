@@ -52,10 +52,10 @@ export function MessageList() {
       computeItemKey={(_, msg) => msg.id}
       itemContent={(_, msg) => (
         <div className="mx-auto max-w-4xl space-y-3 px-4 py-4 md:px-8">
-          {msg.role !== 'user' && (msg.thinking || msg.agentSteps?.length || msg.retrieval) && (
+          {msg.role !== 'user' && (msg.thinking || msg.agentSteps?.length || msg.retrieval || msg.progress) && (
             <div className="ml-11 space-y-2">
               {msg.thinking && <ThinkingPanel content={msg.thinking} />}
-              {msg.retrieval && (
+              {(msg.retrieval || msg.agentSteps?.length || msg.progress) && (
                 <AgentStepTrace
                   retrieval={msg.retrieval}
                   steps={msg.agentSteps}

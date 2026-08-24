@@ -158,7 +158,13 @@ async def _run_agent(
     async def _emit(event: str, data: dict) -> None:
         if emit is not None:
             await emit(event, data)
-        events_log.append({"event": event, "data": data, "ts": time.time()})
+        # 非流式接口的 agent_steps 只保留真正的节点事件。旧实现把每个 token
+        # 都塞进 events_log，长回答会产生数百条无意义的“步骤”并浪费内存。
+        if event == EV_AGENT_STEP:
+            events_log.append({"event": event, "data": data, "ts": time.time()})
+
+    # 第一帧必须尽早发出：即使后续模型冷启动或检索较慢，用户也能立即看到反馈。
+    await _emit(EV_PROGRESS, {"pct": 2, "label": "已收到问题，正在准备分析…"})
 
     # 1. 加载历史消息
     history_rows = db.message_list_by_session(req.session_id, limit=20)
@@ -214,6 +220,7 @@ async def _run_agent(
 
     # 5. 跑 LangGraph (retrieval loop)
     try:
+        await _emit(EV_PROGRESS, {"pct": 5, "label": "正在初始化 Agent…"})
         graph = await get_compiled_graph()
     except Exception as e:  # noqa: BLE001
         raise
@@ -221,26 +228,87 @@ async def _run_agent(
     config = {"configurable": {"thread_id": req.session_id}}
     final_state: dict = dict(state)
 
-    # 直接用 graph.ainvoke, 拿最终 state
+    # 使用 astream(updates) 逐节点执行。旧实现 graph.ainvoke 会等 route → retrieve
+    # → rerank → evaluate 全部结束才返回，导致前端在数秒到数十秒内完全无反馈。
+    retrieval_emitted = False
+    retrieval_round = 0
+    await _emit(EV_AGENT_STEP, {"node": "route", "status": "running"})
+    await _emit(EV_PROGRESS, {"pct": 8, "label": "正在理解问题与判断检索路径…"})
     try:
-        result = await graph.ainvoke(state, config=config)
-        final_state.update(result)
+        async for update in graph.astream(state, config=config, stream_mode="updates"):
+            if not isinstance(update, dict):
+                continue
+            for node_name, node_update in update.items():
+                if not isinstance(node_update, dict):
+                    continue
+                final_state.update(node_update)
+                await _emit(EV_AGENT_STEP, {"node": node_name, "status": "done"})
+
+                if node_name == "route":
+                    if final_state.get("route_decision") == "direct":
+                        await _emit(EV_PROGRESS, {
+                            "pct": 58,
+                            "label": "问题无需知识库检索，正在组织回答…",
+                        })
+                    else:
+                        await _emit(EV_AGENT_STEP, {"node": "retrieve", "status": "running"})
+                        await _emit(EV_PROGRESS, {"pct": 18, "label": "正在检索知识库…"})
+
+                elif node_name == "retrieve":
+                    retrieval_round += 1
+                    retrieved = final_state.get("retrieved", [])
+                    doc_ids = final_state.get("retrieved_doc_ids", [])
+                    await _emit(EV_RETRIEVAL, {
+                        "doc_ids": doc_ids,
+                        "count": len(retrieved),
+                        "scores": [round(h.score, 4) for h in retrieved[:10]],
+                    })
+                    retrieval_emitted = True
+                    await _emit(EV_AGENT_STEP, {"node": "rerank", "status": "running"})
+                    await _emit(EV_PROGRESS, {
+                        "pct": 38 if retrieval_round == 1 else 56,
+                        "label": (
+                            f"已找到 {len(retrieved)} 个候选片段，正在筛选证据…"
+                            if retrieval_round == 1
+                            else f"扩展检索命中 {len(retrieved)} 个片段，正在重新筛选…"
+                        ),
+                    })
+
+                elif node_name == "rerank":
+                    await _emit(EV_AGENT_STEP, {"node": "evaluate", "status": "running"})
+                    await _emit(EV_PROGRESS, {
+                        "pct": 52 if retrieval_round == 1 else 59,
+                        "label": "正在校验资料相关性…",
+                    })
+
+                elif node_name == "evaluate":
+                    if final_state.get("needs_more_retrieval"):
+                        await _emit(EV_AGENT_STEP, {"node": "retrieve", "status": "running"})
+                        await _emit(EV_PROGRESS, {
+                            "pct": 54,
+                            "label": "现有证据不足，正在扩展检索…",
+                        })
+                    else:
+                        await _emit(EV_PROGRESS, {
+                            "pct": 62,
+                            "label": "证据校验完成，正在组织回答…",
+                        })
     except Exception as e:  # noqa: BLE001
-        logger.exception("graph.ainvoke failed")
+        logger.exception("graph.astream failed")
         raise
 
-    # 6. 推送检索事件
-    if final_state.get("retrieved_doc_ids"):
+    # 6. 兼容性兜底: 正常 astream 已在 retrieve 节点完成时推送；若未来图实现
+    # 不产生该 update，仍在生成答案前补发一次检索快照。
+    if final_state.get("retrieved_doc_ids") and not retrieval_emitted:
         await _emit(EV_RETRIEVAL, {
             "doc_ids": final_state["retrieved_doc_ids"],
             "count": len(final_state.get("retrieved", [])),
             "scores": [round(h.score, 4) for h in final_state.get("retrieved", [])[:10]],
         })
-    if final_state.get("citations"):
-        await _emit(EV_PROGRESS, {"pct": 60, "label": "已生成引用, 正在回答..."})
 
     # 7. 跑 answer 流式 (直接调 LLM, 不走 graph)
     await _emit(EV_AGENT_STEP, {"node": "answer", "status": "running"})
+    await _emit(EV_PROGRESS, {"pct": 68, "label": "正在生成回答，内容将实时显示…"})
 
     async def _on_token(content: str) -> None:
         await _emit(EV_TOKEN, {"content": content})

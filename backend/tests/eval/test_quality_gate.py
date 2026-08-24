@@ -153,6 +153,65 @@ def test_colbert_storage_preserves_sparse_weights():
     (data_dir() / colbert_path).unlink(missing_ok=True)
 
 
+def test_chat_stream_reports_graph_progress_before_answer(monkeypatch):
+    """流式端点不能等检索图全部结束后才给用户第一帧反馈。"""
+    from app.api import chat
+    from app.models.schemas import ChatRequest
+
+    class FakeHit:
+        score = 0.91
+
+    class FakeGraph:
+        async def astream(self, state, config=None, stream_mode=None):
+            assert stream_mode == "updates"
+            yield {"route": {"route_decision": "retrieve", "query_rewritten": "测试问题"}}
+            yield {"retrieve": {"retrieved": [FakeHit()], "retrieved_doc_ids": ["doc-1"]}}
+            yield {"rerank": {"reranked": [FakeHit()], "citations": []}}
+            yield {"evaluate": {"needs_more_retrieval": False}}
+
+    async def fake_get_graph():
+        return FakeGraph()
+
+    async def fake_answer(state, on_token=None, **_kwargs):
+        await on_token("## 核心结论\n\n流式答案")
+        return {"final_answer": "## 核心结论\n\n流式答案", "citations": []}
+
+    async def fake_schedule_push():
+        return None
+
+    monkeypatch.setattr(chat, "get_compiled_graph", fake_get_graph)
+    monkeypatch.setattr(chat, "answer_node_stream", fake_answer)
+    monkeypatch.setattr(chat, "schedule_push", fake_schedule_push)
+    monkeypatch.setattr(chat.db, "message_list_by_session", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(chat.db, "session_get", lambda *_args, **_kwargs: {"title": "已有会话"})
+    monkeypatch.setattr(chat.db, "session_upsert", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(chat.db, "message_insert", lambda *_args, **_kwargs: None)
+
+    events = []
+
+    async def emit(event, data):
+        events.append((event, data))
+
+    req = ChatRequest(session_id="stream-test", message="测试问题")
+    state, _steps = asyncio.run(chat._run_agent(req, emit=emit))
+
+    assert events[0][0] == chat.EV_PROGRESS
+    assert events[0][1]["pct"] <= 2
+    assert (chat.EV_AGENT_STEP, {"node": "route", "status": "running"}) in events
+    retrieval_index = next(i for i, item in enumerate(events) if item[0] == chat.EV_RETRIEVAL)
+    token_index = next(i for i, item in enumerate(events) if item[0] == chat.EV_TOKEN)
+    assert retrieval_index < token_index
+    assert state["final_answer"].startswith("## 核心结论")
+
+
+def test_answer_prompt_requires_semantic_markdown_hierarchy():
+    from app.agents.prompts import ANSWER_PROMPT
+
+    assert "## 核心结论" in ANSWER_PROMPT
+    assert "###" in ANSWER_PROMPT
+    assert "## 参考来源" in ANSWER_PROMPT
+
+
 # ========== 端到端 (用 deepeval) ==========
 def test_deepeval_e2e():
     """DeepEval 端到端: 摄入 → 检索 → 回答 → 4 个指标.

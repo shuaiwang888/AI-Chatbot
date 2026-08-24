@@ -303,7 +303,10 @@ async def answer_node_stream(
         context = "(无相关文档)"
 
     prompt = ANSWER_PROMPT.format(context=context, query=query, LOCALE=locale)
-    system_msg = "你是私人智能客服, 回答需基于 context 引用, 用对应 locale 回答。"
+    system_msg = (
+        "你是私人智能客服。回答需基于 context 引用，并使用清晰、语义正确的 "
+        "Markdown 层级；复杂回答用二级标题组织，三级标题只用于二级标题之下。"
+    )
 
     # 缓存 key
     top_doc_ids = [c["doc_id"] for c in state.get("citations", [])]

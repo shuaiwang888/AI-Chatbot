@@ -631,6 +631,16 @@ function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需
 
 **验证**: GitHub 后端 CI 成功；HF runtime/repo SHA 一致；匿名 readyz/documents 均 401；授权 readyz 显示 LLM、Chroma、cold_restore 正常且 `last_error=null`；生产 RAG 问答返回非空答案和 5 条引用，测试会话删除并成功持久化。
 
+### 4.16 [全栈] 问答等待阶段无反馈 + Markdown 层级不明显
+
+**症状**: 用户发问后，前端长时间只有空白助手气泡；直到检索、重排和证据评估全部完成才出现内容。回答虽然能解析 Markdown，但 H1/H2/H3 的字号和间距接近，标题、列表、表格不容易区分。
+
+**根因**: `chat.py` 用 `graph.ainvoke()` 等整张检索图完成后才推送首个业务事件；前端新建助手消息时没有初始 progress，`MessageList` 也只在已有 retrieval 时才渲染追踪卡。生成提示词没有约束语义化 Markdown，CSS 中 H2/H3 只有约 1em。
+
+**修复**: 后端改用 `graph.astream(stream_mode="updates")`，逐节点推送 route/retrieve/rerank/evaluate 状态、单调递增进度和检索快照；前端请求发出即显示进度卡与空回答占位反馈；答案提示词规定 H2/H3、列表、表格和参考来源结构；Markdown CSS 拉开标题字号、间距、左侧强调线、列表 marker、表格与代码块层级。
+
+**回归保护**: `test_chat_stream_reports_graph_progress_before_answer` 验证首帧 progress 早于检索和 token，`test_answer_prompt_requires_semantic_markdown_hierarchy` 防止排版约束回退。TypeScript、Vite build、Python 3.12 回归测试均通过。
+
 ---
 
 ## 5. 已建立的工具脚本 (遇到问题先看这里)

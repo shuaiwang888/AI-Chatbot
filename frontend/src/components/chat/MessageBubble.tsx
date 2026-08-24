@@ -6,7 +6,7 @@
  * 流式时, 父组件 re-render 不再让所有历史 bubble 跟着重渲染,
  * 只重渲当前 streaming 那个 (props 引用变化的那个).
  */
-import { Bot, Copy, User } from 'lucide-react';
+import { Bot, Copy, Loader2, User } from 'lucide-react';
 import { memo, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -62,18 +62,25 @@ function MessageBubbleInner({ message }: { message: ChatMessage }) {
           visibleText || (message.streaming ? '' : '(空消息)')
         ) : (
           <div className="prose-chat">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
-              components={{
-                // 链接外开
-                a: ({ node, ...props }) => (
-                  <a {...props} target="_blank" rel="noopener noreferrer" />
-                ),
-              }}
-            >
-              {visibleText || (message.streaming ? '' : '_(无回答)_')}
-            </ReactMarkdown>
+            {message.streaming && !visibleText ? (
+              <div className="flex min-h-6 items-center gap-2 text-muted-foreground" role="status">
+                <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                <span>{message.progress?.label || 'Agent 正在分析问题…'}</span>
+              </div>
+            ) : (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
+                components={{
+                  // 链接外开
+                  a: ({ node, ...props }) => (
+                    <a {...props} target="_blank" rel="noopener noreferrer" />
+                  ),
+                }}
+              >
+                {visibleText || '_(无回答)_'}
+              </ReactMarkdown>
+            )}
           </div>
         )}
       </div>

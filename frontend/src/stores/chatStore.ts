@@ -236,6 +236,7 @@ export const useChatStore = create<ChatState>()(
             citations: [],
             toolCalls: [],
             agentSteps: [],
+            progress: { pct: 1, label: '正在连接 Agent…' },
             streaming: true,
             createdAt: Date.now(),
           },

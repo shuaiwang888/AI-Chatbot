@@ -1,16 +1,11 @@
 /**
- * Agent 步骤追踪 + 检索 + 进度. 给开发者看 agent 流程用.
+ * 面向用户的实时处理进度：问题分析 → 知识检索 → 证据筛选 → 回答生成。
  */
 import {
-  Activity, Bot, CheckCircle2, Circle, Compass, Filter, GitBranch,
-  Hammer, Loader2, Search, Wrench,
+  Activity, Bot, CheckCircle2, Circle, Compass, Filter,
+  Hammer, Loader2, Search, ShieldCheck,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
-import type {
-  AgentStepEvent,
-  ProgressEvent,
-  RetrievalEvent,
-} from '@/types';
+import type { AgentStepEvent, ProgressEvent, RetrievalEvent } from '@/types';
 import { cn } from '@/lib/utils';
 
 export interface AgentStepTraceProps {
@@ -19,73 +14,88 @@ export interface AgentStepTraceProps {
   progress?: ProgressEvent;
 }
 
-const NODE_META: Record<string, { label: string; icon: any; color: string }> = {
-  route:          { label: '路由',         icon: Compass,  color: 'text-amber-500' },
-  query_rewrite:  { label: '查询改写',     icon: GitBranch, color: 'text-blue-500' },
-  retrieve:       { label: '检索',         icon: Search,   color: 'text-violet-500' },
-  rerank:         { label: '精排',         icon: Filter,   color: 'text-indigo-500' },
-  tool_executor:  { label: '工具调用',     icon: Hammer,   color: 'text-orange-500' },
-  answer:         { label: '生成',         icon: Bot,      color: 'text-emerald-500' },
-  evaluate:       { label: '评估',         icon: Activity, color: 'text-pink-500' },
+const NODE_META: Record<string, { label: string; icon: typeof Activity }> = {
+  route:         { label: '理解问题', icon: Compass },
+  query_rewrite: { label: '优化问题', icon: Activity },
+  retrieve:      { label: '检索资料', icon: Search },
+  rerank:        { label: '筛选证据', icon: Filter },
+  evaluate:      { label: '校验证据', icon: ShieldCheck },
+  tool_executor: { label: '调用工具', icon: Hammer },
+  answer:        { label: '生成回答', icon: Bot },
 };
 
 export function AgentStepTrace({ retrieval, steps, progress }: AgentStepTraceProps) {
   if (!retrieval && !steps?.length && !progress) return null;
 
+  const pct = Math.max(0, Math.min(100, progress?.pct ?? 0));
+  const isDone = pct >= 100;
+
   return (
-    <div className="rounded-md border border-dashed border-border/80 bg-muted/20 px-2.5 py-1.5 text-xs">
-      <div className="mb-1 flex items-center gap-1.5 text-muted-foreground">
-        <Activity className="h-3 w-3" />
-        <span>Agent 执行追踪</span>
-        {progress && (
-          <Badge variant="secondary" className="ml-auto gap-1 font-mono">
-            <span className="h-1.5 w-1.5 rounded-full bg-sky-500 animate-pulse" />
-            {progress.pct}% · {progress.label}
-          </Badge>
-        )}
+    <div
+      className="overflow-hidden rounded-xl border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-white/[0.025] to-violet-500/[0.05] text-xs shadow-[0_8px_30px_rgba(0,0,0,.08)]"
+      aria-live="polite"
+    >
+      <div className="flex items-start gap-2.5 px-3 py-2.5">
+        <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary">
+          {isDone ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-foreground">{isDone ? '处理完成' : 'Agent 正在处理'}</span>
+            <span className="ml-auto font-mono text-[10px] text-primary/80">{pct}%</span>
+          </div>
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+            {progress?.label || '正在分析问题…'}
+          </p>
+        </div>
       </div>
 
-      {/* 检索结果 */}
-      {retrieval && (
-        <div className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-foreground/75">
-          <Search className="h-3 w-3 text-violet-500" />
-          <span>
-            命中 <strong className="text-violet-600 dark:text-violet-400">{retrieval.count}</strong> 个 chunk,
-            来自 <strong className="text-sky-600 dark:text-sky-400">{retrieval.doc_ids.length}</strong> 个文档
-          </span>
-        </div>
-      )}
+      <div className="h-px bg-white/[0.05]">
+        <div
+          className="h-full bg-gradient-to-r from-sky-400 via-primary to-violet-400 transition-[width] duration-500 ease-out"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
 
-      {/* 步骤 */}
       {steps && steps.length > 0 && (
-        <div className="space-y-0.5">
-          {steps.map((s, i) => {
-            const meta = NODE_META[s.node] || { label: s.node, icon: Circle, color: 'text-muted-foreground' };
+        <div className="flex flex-wrap gap-1.5 px-3 py-2.5">
+          {steps.map((step) => {
+            const meta = NODE_META[step.node] || { label: step.node, icon: Circle };
             const Icon = meta.icon;
+            const running = step.status === 'running';
+            const done = step.status === 'done';
             return (
-              <div key={i} className="flex items-center gap-1.5">
-                {s.status === 'running' ? (
-                  <Loader2 className="h-3 w-3 animate-spin text-sky-500" />
-                ) : s.status === 'done' ? (
-                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />
-                ) : (
-                  <Circle className="h-3 w-3 text-rose-500" />
+              <div
+                key={step.node}
+                className={cn(
+                  'flex items-center gap-1.5 rounded-full border px-2 py-1 transition-colors',
+                  running && 'border-primary/30 bg-primary/10 text-foreground',
+                  done && 'border-emerald-400/15 bg-emerald-400/[0.06] text-foreground/65',
+                  step.status === 'error' && 'border-destructive/30 bg-destructive/10 text-destructive',
                 )}
-                <Icon className={cn('h-3 w-3', meta.color)} />
-                <span className={cn(
-                  s.status === 'done' && 'text-foreground/60',
-                  s.status === 'error' && 'text-destructive',
-                )}>
-                  {meta.label}
-                </span>
+              >
+                {running ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                ) : done ? (
+                  <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                ) : (
+                  <Circle className="h-3 w-3" />
+                )}
+                <Icon className="h-3 w-3" />
+                <span>{meta.label}</span>
               </div>
             );
           })}
         </div>
       )}
+
+      {retrieval && (
+        <div className="flex items-center gap-1.5 border-t border-white/[0.05] px-3 py-2 text-[11px] text-muted-foreground">
+          <Search className="h-3 w-3 text-violet-400" />
+          已命中 <strong className="font-semibold text-foreground">{retrieval.count}</strong> 个片段，来自{' '}
+          <strong className="font-semibold text-foreground">{retrieval.doc_ids.length}</strong> 个文档
+        </div>
+      )}
     </div>
   );
 }
-
-// 防止引用未使用
-export { Wrench };
