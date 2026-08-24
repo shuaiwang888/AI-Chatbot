@@ -1,11 +1,11 @@
 /**
- * 消息列表. 含 ThinkingPanel / AgentStepTrace / CitationPanel 的内联展示.
+ * 消息列表. 含 AgentStepTrace / CitationPanel 的内联展示.
+ * 模型原始 reasoning 只用于从正文剥离，不直接暴露；过程反馈由结构化节点事件提供。
  * 用 react-virtuoso 虚拟化, 适合长对话.
  */
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { ThinkingPanel } from './ThinkingPanel';
 import { AgentStepTrace } from './AgentStepTrace';
 import { CitationPanel } from './CitationPanel';
 import { useChatStore } from '@/stores/chatStore';
@@ -52,9 +52,8 @@ export function MessageList() {
       computeItemKey={(_, msg) => msg.id}
       itemContent={(_, msg) => (
         <div className="mx-auto max-w-4xl space-y-3 px-4 py-4 md:px-8">
-          {msg.role !== 'user' && (msg.thinking || msg.agentSteps?.length || msg.retrieval || msg.progress) && (
+          {msg.role !== 'user' && (msg.agentSteps?.length || msg.retrieval || msg.progress) && (
             <div className="ml-11 space-y-2">
-              {msg.thinking && <ThinkingPanel content={msg.thinking} />}
               {(msg.retrieval || msg.agentSteps?.length || msg.progress) && (
                 <AgentStepTrace
                   retrieval={msg.retrieval}

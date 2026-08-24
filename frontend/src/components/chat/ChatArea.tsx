@@ -68,7 +68,7 @@ export function ChatArea() {
             <p className="hidden text-[9px] text-muted-foreground sm:block">检索、推理、引用自动完成</p>
           </div>
         </div>
-        <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.035] px-2.5 py-1.5 text-[10px] text-muted-foreground" title="使用混合检索、重排和引用生成">
+        <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.035] px-2.5 py-1.5 text-[10px] text-muted-foreground" title="使用混合检索、证据筛选和引用生成">
           <BadgeCheck className="h-3 w-3 text-emerald-400" /> RAG 增强模式
         </div>
       </div>

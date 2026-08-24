@@ -637,7 +637,7 @@ function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需
 
 **根因**: `chat.py` 用 `graph.ainvoke()` 等整张检索图完成后才推送首个业务事件；前端新建助手消息时没有初始 progress，`MessageList` 也只在已有 retrieval 时才渲染追踪卡。生成提示词没有约束语义化 Markdown，CSS 中 H2/H3 只有约 1em。
 
-**修复**: 后端改用 `graph.astream(stream_mode="updates")`，逐节点推送 route/retrieve/rerank/evaluate 状态、单调递增进度和检索快照；前端请求发出即显示进度卡与空回答占位反馈；答案提示词规定 H2/H3、列表、表格和参考来源结构；Markdown CSS 拉开标题字号、间距、左侧强调线、列表 marker、表格与代码块层级。生产计时进一步发现 BGE CrossEncoder 在免费 CPU 上重排 20 个候选耗时约 73 秒，因此新增 `ENABLE_RERANKER` 并默认关闭，沿用 BGE-M3 dense+sparse RRF 排序及 dense cosine 相关性；GPU Space 可显式开启。
+**修复**: 后端改用 `graph.astream(stream_mode="updates")`，逐节点推送 route/retrieve/rerank/evaluate 状态、单调递增进度和检索快照；前端请求发出即显示进度卡与空回答占位反馈，并隐藏模型原始 reasoning（过程反馈只展示结构化阶段状态）；答案提示词规定 H2/H3、列表、表格和参考来源结构；Markdown CSS 拉开标题字号、间距、左侧强调线、列表 marker、表格与代码块层级。生产计时进一步发现 BGE CrossEncoder 在免费 CPU 上重排 20 个候选耗时约 73 秒，因此新增 `ENABLE_RERANKER` 并默认关闭，沿用 BGE-M3 dense+sparse RRF 排序及 dense cosine 相关性；GPU Space 可显式开启。
 
 **回归保护**: `test_chat_stream_reports_graph_progress_before_answer` 验证首帧 progress 早于检索和 token，`test_answer_prompt_requires_semantic_markdown_hierarchy` 防止排版约束回退，`test_cpu_default_skips_cross_encoder_reranker` 防止 CPU 慢路径回归。TypeScript、Vite build、Python 3.12 回归测试均通过。
 
