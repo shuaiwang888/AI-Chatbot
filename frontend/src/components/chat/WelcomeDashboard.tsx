@@ -73,8 +73,8 @@ export function WelcomeDashboard() {
             </span>
             {serviceState.label}
           </div>
-          <h2 className="welcome-title text-balance text-[2.15rem] font-semibold leading-[1.08] tracking-[-0.045em] text-white sm:text-[2.65rem] md:text-[3.1rem]">
-            让你的资料，成为<br className="hidden sm:block" />可以对话的知识。
+          <h2 className="welcome-title whitespace-nowrap text-[clamp(1rem,4.6vw,2rem)] font-semibold leading-[1.08] tracking-[-0.045em] text-white">
+            让你的资料，成为可以对话的知识。
           </h2>
           <p className="mx-auto mt-4 max-w-2xl text-[13px] leading-6 text-muted-foreground sm:text-sm">
             提问、比较、总结或审阅。NEXUS 会检索相关资料，组织答案，并保留每一条可追溯的引用。

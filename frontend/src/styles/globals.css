@@ -210,7 +210,7 @@
 @media (min-width: 768px) and (max-height: 760px) {
   .welcome-content { justify-content: flex-start; padding-top: 1.75rem; padding-bottom: 1.75rem; }
   .welcome-mark { width: 3rem; height: 3rem; margin-bottom: .75rem; }
-  .welcome-title { font-size: 2.35rem; }
+  .welcome-title { font-size: 2rem; }
   .welcome-actions { margin-top: 1.5rem; }
 }
 
