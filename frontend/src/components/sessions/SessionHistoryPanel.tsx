@@ -150,7 +150,7 @@ export function SessionHistoryPanel() {
   if (!open) {
     // 折叠态: 只露一个竖排的展开按钮
     return (
-      <aside className="hidden w-14 shrink-0 flex-col items-center rounded-2xl border border-white/[0.07] bg-white/[0.025] py-2 lg:flex">
+      <aside className="apple-material-heavy hidden w-14 shrink-0 flex-col items-center rounded-[1.55rem] py-2 lg:flex">
         <Button
           size="icon"
           variant="ghost"
@@ -167,7 +167,7 @@ export function SessionHistoryPanel() {
           onClick={handleNew}
           title="新对话"
           aria-label="新对话"
-        disabled={!hasAccessToken || createMut.isPending}
+          disabled={!hasAccessToken || createMut.isPending}
         >
           {createMut.isPending ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -180,12 +180,13 @@ export function SessionHistoryPanel() {
   }
 
   return (
-    <aside className="fixed inset-y-0 right-0 z-30 flex w-[min(22rem,88vw)] shrink-0 flex-col border-l border-white/[0.08] bg-[hsl(232_34%_10%/.98)] shadow-2xl backdrop-blur-xl transition duration-300 lg:relative lg:inset-auto lg:z-auto lg:w-[20rem] lg:rounded-2xl lg:border lg:bg-white/[0.025] lg:shadow-none">
+    <aside className="apple-material-heavy spring-surface fixed bottom-0 right-0 top-[4.25rem] z-30 flex w-[min(22rem,90vw)] shrink-0 flex-col rounded-l-[1.55rem] border-y-0 border-r-0 lg:relative lg:inset-auto lg:z-auto lg:w-[19rem] lg:rounded-[1.55rem] lg:border">
+      <div className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-white/15 lg:hidden" />
       {/* 顶部 */}
-      <div className="flex h-16 shrink-0 items-center justify-between gap-1 border-b border-white/[0.06] px-3">
-        <div className="flex items-center gap-2 text-sm font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/10 text-violet-300"><History className="h-4 w-4" /></div>
-          <div><span>会话记录</span><p className="mt-0.5 text-[9px] font-normal text-muted-foreground">{sessions.length} conversations</p></div>
+      <div className="flex h-14 shrink-0 items-center justify-between gap-1 px-2.5">
+        <div className="flex items-center gap-2 text-[13px] font-semibold tracking-[-0.015em]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-[.72rem] bg-white/[0.055] text-primary"><History className="h-4 w-4" /></div>
+          <div><span>最近对话</span><p className="mt-0.5 text-[9px] font-normal tracking-normal text-muted-foreground">{sessions.length} 个会话</p></div>
         </div>
         <div className="flex items-center gap-0.5">
           <Button
@@ -214,21 +215,21 @@ export function SessionHistoryPanel() {
         </div>
       </div>
 
-      <div className="space-y-3 border-b border-white/[0.06] p-3">
-        <Button className="h-10 w-full justify-center rounded-xl bg-gradient-to-r from-blue-500 to-violet-500 text-white shadow-[0_8px_24px_rgba(59,130,246,.2)] hover:from-blue-400 hover:to-violet-400" onClick={handleNew} disabled={!hasAccessToken || createMut.isPending}>
+      <div className="space-y-2.5 px-3 pb-3 pt-1">
+        <Button className="h-10 w-full justify-center rounded-[.85rem]" onClick={handleNew} disabled={!hasAccessToken || createMut.isPending}>
           {createMut.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           新建对话
         </Button>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索会话…" className="h-9 w-full rounded-xl border border-white/[0.07] bg-black/10 pl-9 pr-8 text-xs outline-none transition placeholder:text-muted-foreground/60 focus:border-primary/40" />
+          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索会话…" className="apple-focus h-9 w-full rounded-[.8rem] border border-white/[0.07] bg-black/15 pl-9 pr-8 text-xs outline-none placeholder:text-muted-foreground/55" />
           {query && <button type="button" onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="清除搜索"><X className="h-3.5 w-3.5" /></button>}
         </div>
       </div>
 
       {/* 列表 */}
-      <ScrollArea className="flex-1">
-        <div className="flex flex-col gap-1 p-2">
+      <ScrollArea className="scroll-edge-mask flex-1">
+        <div className="flex flex-col gap-1 px-2 pb-4 pt-2">
           {!hasAccessToken && (
             <div className="flex flex-col items-center rounded-xl border border-dashed border-amber-500/20 bg-amber-500/[0.04] px-4 py-8 text-center">
               <KeyRound className="mb-2 h-5 w-5 text-amber-300" />

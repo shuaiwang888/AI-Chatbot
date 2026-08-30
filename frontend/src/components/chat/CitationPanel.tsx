@@ -31,14 +31,14 @@ export function CitationPanel({ citations }: { citations: Citation[] }) {
   const uniqueDocs = new Set(citations.map((c) => c.doc_id));
 
   return (
-    <div className="rounded-lg border border-border bg-card text-xs shadow-sm">
+    <div className="overflow-hidden rounded-[1rem] border border-white/[0.065] bg-black/15 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,.035)]">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-accent/40"
+        className="apple-focus flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-white/[0.035]"
       >
         <span className="flex items-center gap-1.5 font-medium">
           {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-          <Library className="h-3.5 w-3.5 text-violet-500" />
+          <Library className="h-3.5 w-3.5 text-primary" />
           <span>引用源</span>
           <Badge variant="secondary" className="ml-1 font-mono">
             {citations.length}
@@ -59,13 +59,13 @@ export function CitationPanel({ citations }: { citations: Citation[] }) {
               <div
                 key={`${c.doc_id}-${c.rank}`}
                 className={cn(
-                  'overflow-hidden rounded-md border border-border/60 bg-background',
-                  'transition-colors hover:border-primary/40',
+                  'overflow-hidden rounded-[.8rem] border border-white/[0.055] bg-black/15',
+                  'transition-colors hover:border-primary/30',
                 )}
               >
                 <button
                   onClick={() => toggleExpand(c.rank)}
-                  className="flex w-full items-center gap-2 px-2.5 py-1.5 text-left transition-colors hover:bg-accent/30"
+                  className="apple-focus flex w-full items-center gap-2 px-2.5 py-2 text-left hover:bg-white/[0.035]"
                 >
                   {isExpanded ? (
                     <ChevronDown className="h-3 w-3 shrink-0" />
@@ -75,7 +75,7 @@ export function CitationPanel({ citations }: { citations: Citation[] }) {
                   <Badge variant="secondary" className="shrink-0 font-mono">
                     [{c.rank}]
                   </Badge>
-                  <FileText className="h-3 w-3 shrink-0 text-sky-500" />
+                  <FileText className="h-3 w-3 shrink-0 text-primary" />
                   <span className="truncate font-medium" title={c.filename || c.doc_id}>
                     {c.filename || c.doc_id.slice(0, 8)}
                   </span>
@@ -100,7 +100,7 @@ export function CitationPanel({ citations }: { citations: Citation[] }) {
                   </Badge>
                 </button>
                 {isExpanded && (
-                  <div className="border-t border-border/60 bg-muted/30 px-2.5 py-2 max-h-64 overflow-y-auto scrollbar-thin">
+                  <div className="scrollbar-thin max-h-64 overflow-y-auto border-t border-white/[0.055] bg-black/20 px-2.5 py-2">
                     <div className="mb-1 flex items-center gap-1 text-[10px] text-muted-foreground">
                       <Quote className="h-3 w-3" />
                       <span>原文片段</span>

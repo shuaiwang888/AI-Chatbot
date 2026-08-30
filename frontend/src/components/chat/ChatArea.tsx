@@ -1,5 +1,5 @@
 /**
- * ChatArea 容器. 包含 MessageList + ChatInput + 背景 LightRays 效果.
+ * ChatArea 容器. 包含 MessageList + ChatInput + restrained ambient depth.
  *
  * sessionId 来源:
  * - 只用 store.sessionId (右侧栏 / 自动创建 / 历史点击 写入)
@@ -15,61 +15,36 @@
  *   异步过程中, 几毫秒), 这种短暂窗口 send() 会被禁用 (见 useChatStream
  *   的 isPending / 校验). 不影响正常使用.
  *
- * 背景效果: LightRays 光束 (WebGL ogl). 默认开启, uiStore 关闭.
- *   - absolute 定位, pointer-events-none 不挡交互
- *   - mix-blend-mode: screen 让光束与浅背景融合
- *   - raysOrigin 从顶部中央向下发射 (默认)
- *   - followMouse 鼠标移动时光束方向微微偏转
+ * 环境光使用静态 CSS 材质，避免全视口持续运动，并尊重用户的运动偏好.
  */
 import { MessageList } from './MessageList';
 import { ChatInput } from './ChatInput';
-import { lazy, Suspense } from 'react';
 import { BadgeCheck, BrainCircuit } from 'lucide-react';
 import { useChatStore } from '@/stores/chatStore';
 import { useUIStore } from '@/stores/uiStore';
 
-// WebGL/OGL is decorative; keep it out of the initial interactive bundle.
-const LightRays = lazy(() => import('@/components/effects/LightRays'));
-
 export function ChatArea() {
   const sessionId = useChatStore((s) => s.sessionId);
-  const showFluidBackground = useUIStore((s) => s.showFluidBackground);
+  const showAmbient = useUIStore((s) => s.showFluidBackground);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden rounded-none bg-[radial-gradient(circle_at_50%_-20%,rgba(75,94,255,.12),transparent_44%)] lg:rounded-2xl lg:border lg:border-white/[0.07] lg:bg-black/10 lg:shadow-[0_24px_80px_rgba(0,0,0,.18)]">
-      {/* 背景光束层 (WebGL, pointer-events-none 不挡交互) */}
-      {showFluidBackground && (
-        <div
-          className="pointer-events-none absolute inset-0 z-0 mix-blend-screen opacity-50"
-        >
-          <Suspense fallback={null}>
-            <LightRays
-              raysOrigin="top-center"
-              raysColor="#8b9eff"
-              raysSpeed={0.6}
-              lightSpread={0.55}
-              rayLength={1.6}
-              followMouse={true}
-              mouseInfluence={0.15}
-              noiseAmount={0.05}
-              distortion={0.03}
-            />
-          </Suspense>
-        </div>
+    <div className="apple-material-thin relative flex h-full flex-col overflow-hidden rounded-none border-x-0 border-b-0 lg:rounded-[1.55rem] lg:border">
+      {showAmbient && (
+        <div className="pointer-events-none absolute left-1/2 top-[-13rem] z-0 h-[28rem] w-[42rem] max-w-[95vw] -translate-x-1/2 rounded-full bg-primary/[0.09] blur-[90px]" />
       )}
 
-      <div className="relative z-10 flex h-12 shrink-0 items-center justify-between border-b border-white/[0.06] px-4 md:px-6">
+      <div className="relative z-10 flex h-14 shrink-0 items-center justify-between px-4 after:absolute after:inset-x-0 after:bottom-0 after:h-5 after:translate-y-full after:bg-gradient-to-b after:from-[rgba(15,17,23,.5)] after:to-transparent after:content-[''] md:px-6">
         <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary/25 to-violet-500/15 text-blue-200">
+          <div className="flex h-7 w-7 items-center justify-center rounded-[.62rem] bg-white/[0.065] text-primary shadow-[inset_0_1px_0_rgba(255,255,255,.06)]">
             <BrainCircuit className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-xs font-medium text-foreground">知识库对话</p>
-            <p className="hidden text-[9px] text-muted-foreground sm:block">检索、推理、引用自动完成</p>
+            <p className="truncate text-xs font-semibold tracking-[-0.01em] text-foreground">知识库对话</p>
+            <p className="hidden text-[9px] text-muted-foreground sm:block">检索、组织与引用自动完成</p>
           </div>
         </div>
-        <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/[0.06] bg-white/[0.035] px-2.5 py-1.5 text-[10px] text-muted-foreground" title="使用混合检索、证据筛选和引用生成">
-          <BadgeCheck className="h-3 w-3 text-emerald-400" /> RAG 增强模式
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-white/[0.05] px-2.5 py-1.5 text-[10px] font-medium text-muted-foreground" title="使用混合检索、证据筛选和引用生成">
+          <BadgeCheck className="h-3 w-3 text-emerald-400" /> 知识增强
         </div>
       </div>
       <div className="relative z-10 min-h-0 flex-1">

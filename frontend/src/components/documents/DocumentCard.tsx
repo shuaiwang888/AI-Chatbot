@@ -50,17 +50,17 @@ export function DocumentCard({ doc }: { doc: DocumentMeta }) {
     <>
       <Card
         className={cn(
-          'group cursor-pointer rounded-xl border border-white/[0.07] bg-white/[0.025] shadow-none transition duration-200 hover:-translate-y-0.5 hover:border-primary/35 hover:bg-white/[0.045]',
-          isWorking && 'border-sky-300/60 bg-sky-50/30 dark:bg-sky-950/10',
+          'apple-pressable group cursor-pointer rounded-[1rem] border border-transparent bg-black/15 shadow-none hover:border-white/[0.08] hover:bg-black/25',
+          isWorking && 'border-primary/20 bg-primary/[0.055]',
         )}
         onClick={onCardClick}
       >
         <CardContent className="space-y-1.5 p-3">
           <div className="flex items-start gap-2.5">
-            <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[.65rem] bg-white/[0.055] text-muted-foreground"><FileText className="h-4 w-4" /></div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-1.5">
-                <span className="line-clamp-2 min-w-0 flex-1 break-all text-sm font-medium" title={doc.filename}>
+                <span className="line-clamp-2 min-w-0 flex-1 break-all text-xs font-semibold leading-5 tracking-[-0.01em]" title={doc.filename}>
                   {truncateFilename(doc.filename, 60)}
                 </span>
                 <Badge variant={status.variant} className="shrink-0 gap-1">

@@ -641,6 +641,16 @@ function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需
 
 **回归保护**: `test_chat_stream_reports_graph_progress_before_answer` 验证首帧 progress 早于检索和 token，`test_answer_prompt_requires_semantic_markdown_hierarchy` 防止排版约束回退，`test_cpu_default_skips_cross_encoder_reranker` 防止 CPU 慢路径回归。TypeScript、Vite build、Python 3.12 回归测试均通过。
 
+### 4.17 [前端] Apple Design 空间工作台重设计
+
+**问题**: 原 NEXUS 页面仍有较多霓虹渐变、碎片化卡片和运动背景；顶栏状态分散，输入器、引用与 Agent 进度缺少一致的空间层级；访问令牌依赖浏览器原生 `prompt`，隐私说明和操作可预期性不足。
+
+**根因**: 原组件逐步叠加视觉效果，没有统一区分结构层与交互层的材质、动效和按压反馈；移动抽屉从视口顶端展开，会被悬浮工具栏遮挡。
+
+**修复**: 按 `apple-design` 规范建立 thin / regular / heavy 三层材质和系统字体标尺，收敛为 iOS blue + 近黑背景；删除聊天区 WebGL 光束，改为可关闭的静态环境光；重构浮动工具栏、欢迎任务组、分组侧栏、浮动输入器、消息气泡、进度与引用面板；所有主要按钮加入 pointer-down 缩放反馈、focus-visible、reduced-motion / reduced-transparency / high-contrast 适配；增加 `Cmd/Ctrl + K` 聚焦输入；用应用内安全面板替换原生令牌 prompt，明确说明仅保存于 sessionStorage。移动抽屉从顶栏下方展开，不再遮挡标题和关闭操作。
+
+**验证**: TypeScript `tsc -b --noEmit` 和 Vite 生产构建通过；Playwright 验证 1280×720、1440×900 桌面端与 390×844 移动端，覆盖匿名首屏、令牌面板、资料抽屉与响应式切换；前端 console 无代码错误。
+
 ---
 
 ## 5. 已建立的工具脚本 (遇到问题先看这里)
@@ -748,5 +758,5 @@ unset HF_TOKEN           # 用完清掉
 
 ---
 
-> 最后更新: 本 session (2026-08-24)
+> 最后更新: 本 session (2026-08-30)
 > 维护者: shuaiwang

@@ -37,23 +37,23 @@ function MessageBubbleInner({ message }: { message: ChatMessage }) {
     >
       <div
         className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border',
-          isUser ? 'border-white/10 bg-white/[0.06] text-muted-foreground' : 'border-primary/20 bg-gradient-to-br from-primary to-violet-500 text-white shadow-[0_8px_24px_rgba(59,130,246,.2)]',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-[.72rem] border',
+          isUser ? 'border-white/[0.07] bg-white/[0.045] text-muted-foreground' : 'border-primary/20 bg-primary text-white shadow-[inset_0_1px_0_rgba(255,255,255,.25),0_8px_22px_rgba(10,132,255,.18)]',
         )}
       >
         {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
       </div>
       <div
         className={cn(
-          'group/bubble relative max-w-[84%] rounded-2xl px-4 py-3 text-sm leading-relaxed',
+          'group/bubble relative max-w-[88%] rounded-[1.2rem] px-4 py-3 text-sm leading-relaxed md:max-w-[84%]',
           isUser
-            ? 'rounded-tr-md border border-primary/20 bg-primary/15 text-foreground whitespace-pre-wrap'
-            : 'rounded-tl-md border border-white/[0.07] bg-white/[0.045] text-foreground shadow-[0_10px_35px_rgba(0,0,0,.12)]',
+            ? 'rounded-tr-[.38rem] bg-primary text-white shadow-[inset_0_1px_0_rgba(255,255,255,.14),0_8px_26px_rgba(10,132,255,.13)] whitespace-pre-wrap'
+            : 'rounded-tl-[.38rem] border border-white/[0.065] bg-black/15 text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,.035)]',
           message.streaming && 'streaming-cursor',
         )}
       >
         {!isUser && visibleText && (
-          <button type="button" onClick={() => navigator.clipboard?.writeText(visibleText)} className="absolute -right-1 -top-8 hidden items-center gap-1 rounded-lg border border-white/[0.07] bg-card px-2 py-1 text-[9px] text-muted-foreground shadow-lg transition hover:text-foreground group-hover/bubble:flex" title="复制回答">
+          <button type="button" onClick={() => navigator.clipboard?.writeText(visibleText)} className="apple-focus apple-material-thin absolute -right-1 -top-9 hidden items-center gap-1 rounded-[.65rem] px-2 py-1 text-[9px] text-muted-foreground hover:text-foreground group-hover/bubble:flex" title="复制回答">
             <Copy className="h-3 w-3" /> 复制
           </button>
         )}

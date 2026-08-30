@@ -85,18 +85,16 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
         }
       }}
       className={cn(
-        'group relative flex w-full cursor-pointer items-start gap-2.5 rounded-xl border border-transparent px-3 py-3 text-left transition',
+        'apple-pressable group relative flex w-full cursor-pointer items-start gap-2.5 rounded-[.95rem] border border-transparent px-3 py-2.5 text-left',
         active
-          ? 'border-primary/20 bg-gradient-to-r from-primary/12 to-violet-500/[0.05] text-foreground shadow-[inset_3px_0_0_rgba(59,130,246,.8)]'
-          : 'text-foreground/85 hover:border-white/[0.05] hover:bg-white/[0.035]',
+          ? 'border-primary/15 bg-primary/[0.13] text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,.035)]'
+          : 'text-foreground/85 hover:bg-white/[0.05]',
       )}
+      aria-current={active ? 'true' : undefined}
     >
-      <MessageSquare
-        className={cn(
-          'mt-0.5 h-4 w-4 shrink-0',
-          active ? 'text-primary' : 'text-muted-foreground',
-        )}
-      />
+      <div className={cn('mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[.6rem]', active ? 'bg-primary text-white' : 'bg-white/[0.05] text-muted-foreground')}>
+        <MessageSquare className="h-3.5 w-3.5" />
+      </div>
       <div className="min-w-0 flex-1">
         {editing ? (
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -139,7 +137,7 @@ export function SessionListItem({ session, active, onSelect, collapsed }: Sessio
           </div>
         ) : (
           <>
-            <div className="line-clamp-2 break-words text-xs font-medium leading-5" title={title}>
+            <div className="line-clamp-2 break-words text-xs font-semibold leading-5 tracking-[-0.01em]" title={title}>
               {title}
             </div>
             <div className="mt-1 truncate text-[9px] text-muted-foreground">

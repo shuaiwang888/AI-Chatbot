@@ -9,7 +9,7 @@ interface UIState {
   rightSidebarOpen: boolean; // 历史对话右栏
   theme: 'light' | 'dark' | 'system';
   showDocumentPanel: boolean;
-  /** LightRays 光束背景开关. 默认 true, 顶栏可关闭以省 GPU / 提升性能. */
+  /** 静态环境光开关. 不使用 WebGL，低功耗且遵循 reduced-motion. */
   showFluidBackground: boolean;
   // actions
   toggleSidebar: () => void;

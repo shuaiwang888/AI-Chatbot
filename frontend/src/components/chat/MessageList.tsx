@@ -51,9 +51,9 @@ export function MessageList() {
       // React.memo, 流式时只有当前那条重渲, 历史 bubble 全部跳过.
       computeItemKey={(_, msg) => msg.id}
       itemContent={(_, msg) => (
-        <div className="mx-auto max-w-4xl space-y-3 px-4 py-4 md:px-8">
+        <div className="mx-auto max-w-4xl space-y-3 px-4 py-4 md:px-7 md:py-5">
           {msg.role !== 'user' && (msg.agentSteps?.length || msg.retrieval || msg.progress) && (
-            <div className="ml-11 space-y-2">
+            <div className="ml-10 space-y-2 md:ml-11">
               {(msg.retrieval || msg.agentSteps?.length || msg.progress) && (
                 <AgentStepTrace
                   retrieval={msg.retrieval}
@@ -67,12 +67,12 @@ export function MessageList() {
             <MessageBubble message={msg} />
           </Suspense>
           {msg.role === 'assistant' && msg.citations && msg.citations.length > 0 && (
-            <div className="ml-11">
+            <div className="ml-10 md:ml-11">
               <CitationPanel citations={msg.citations} />
             </div>
           )}
           {msg.error && (
-            <div className="ml-11 rounded border border-destructive/50 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            <div className="ml-10 rounded-[.8rem] border border-destructive/20 bg-destructive/[0.07] px-3 py-2 text-xs text-destructive md:ml-11">
               ⚠️ {msg.error}
             </div>
           )}

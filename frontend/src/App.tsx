@@ -38,14 +38,15 @@ function Workspace() {
   }, [setSidebar, setRightSidebar]);
 
   return (
-    <div className="relative flex h-full min-w-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_15%_0%,rgba(65,87,255,.12),transparent_35%),radial-gradient(circle_at_85%_100%,rgba(139,92,246,.08),transparent_30%)]">
+    <div className="relative flex h-full min-w-0 flex-col overflow-hidden">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(10,132,255,.07),transparent_28%),radial-gradient(circle_at_82%_92%,rgba(94,92,230,.055),transparent_26%)]" />
       <TopBar />
-      <div className="relative flex min-h-0 flex-1 min-w-0 gap-0 overflow-hidden lg:gap-3 lg:p-3 lg:pt-2">
+      <div className="relative flex min-h-0 flex-1 min-w-0 gap-0 overflow-hidden px-0 pb-0 lg:gap-2.5 lg:px-3 lg:pb-3">
         {(sidebarOpen || rightOpen) && (
           <button
             type="button"
             aria-label="关闭侧栏"
-            className="absolute inset-0 z-20 bg-black/55 backdrop-blur-sm lg:hidden"
+            className="absolute inset-0 z-20 bg-black/45 backdrop-blur-md lg:hidden"
             onClick={() => { setSidebar(false); setRightSidebar(false); }}
           />
         )}
@@ -65,7 +66,7 @@ export function App() {
       <HashRouter>
         <Workspace />
         {/* 全局 toast: 删除/上传/错误反馈. theme 跟项目深色主题配 */}
-        <Toaster theme="dark" position="bottom-right" richColors closeButton />
+        <Toaster theme="dark" position="bottom-right" richColors closeButton toastOptions={{ className: 'apple-material' }} />
       </HashRouter>
     </QueryClientProvider>
   );

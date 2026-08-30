@@ -63,7 +63,7 @@ export function DocumentList() {
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="搜索文件名…"
-          className="h-9 w-full rounded-xl border border-white/[0.07] bg-black/10 pl-9 pr-8 text-xs outline-none transition placeholder:text-muted-foreground/60 focus:border-primary/40"
+          className="apple-focus h-9 w-full rounded-[.8rem] border border-white/[0.07] bg-black/15 pl-9 pr-8 text-xs outline-none placeholder:text-muted-foreground/55"
         />
         {query && (
           <button type="button" onClick={() => setQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground" aria-label="清除搜索">

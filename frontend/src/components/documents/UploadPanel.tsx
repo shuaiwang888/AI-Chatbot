@@ -73,21 +73,21 @@ export function UploadPanel() {
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
         className={cn(
-          'rounded-2xl border border-dashed p-4 text-center transition duration-300',
-          dragOver ? 'scale-[1.01] border-primary bg-primary/10' : 'border-white/10 bg-white/[0.025] hover:border-primary/30 hover:bg-white/[0.04]',
+          'spring-surface rounded-[1.1rem] border border-dashed p-4 text-center',
+          dragOver ? 'scale-[1.015] border-primary/70 bg-primary/10 shadow-[0_12px_35px_rgba(10,132,255,.12)]' : 'border-white/10 bg-black/15 hover:border-white/20 hover:bg-black/20',
         )}
       >
-        <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-blue-300">
+        <div className={cn('mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-[.85rem] text-primary transition-colors', dragOver ? 'bg-primary text-white' : 'bg-primary/10')}>
           <Upload className="h-5 w-5" />
         </div>
-        <p className="text-xs font-medium text-foreground">
-          拖入资料开始构建知识
+        <p className="text-xs font-semibold tracking-[-0.01em] text-foreground">
+          将资料拖到这里
         </p>
-        <p className="mt-1 text-[10px] text-muted-foreground">系统会自动解析、分块和建立索引</p>
+        <p className="mt-1 text-[10px] leading-4 text-muted-foreground">松开后自动解析并建立索引</p>
         <Button
           size="sm"
           variant="outline"
-          className="mt-3 rounded-lg border-white/10 bg-white/[0.04] hover:bg-white/[0.08]"
+          className="mt-3 rounded-[.72rem]"
           onClick={() => inputRef.current?.click()}
           disabled={!hasAccessToken || upload.isPending}
         >
@@ -119,10 +119,10 @@ export function UploadPanel() {
       {lastResult && (
         <div
           className={cn(
-            'flex items-center gap-1.5 rounded px-2.5 py-1.5 text-xs',
+            'flex items-center gap-1.5 rounded-[.8rem] border px-2.5 py-2 text-[11px]',
             lastResult.status === 'failed'
-              ? 'bg-destructive/10 text-destructive'
-              : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300',
+              ? 'border-destructive/15 bg-destructive/10 text-destructive'
+              : 'border-emerald-400/10 bg-emerald-400/[0.06] text-emerald-300',
           )}
         >
           {lastResult.status === 'failed' ? (

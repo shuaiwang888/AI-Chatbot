@@ -18,7 +18,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm',
+      'fixed inset-0 z-50 bg-black/55 backdrop-blur-md',
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
       className,
@@ -38,7 +38,7 @@ const DialogContent = React.forwardRef<
       ref={ref}
       className={cn(
         'fixed left-[50%] top-[50%] z-50 grid w-full max-w-3xl translate-x-[-50%] translate-y-[-50%]',
-        'max-h-[90vh] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg',
+        'apple-material-heavy max-h-[90vh] gap-4 rounded-[1.5rem] border-white/10 p-6 shadow-[0_32px_100px_rgba(0,0,0,.52)]',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
         'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
         'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
@@ -50,8 +50,8 @@ const DialogContent = React.forwardRef<
       {children}
       <DialogPrimitive.Close
         className={cn(
-          'absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity',
-          'hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+          'apple-focus absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.07] text-muted-foreground',
+          'hover:bg-white/[0.12] hover:text-foreground focus:outline-none',
           'disabled:pointer-events-none',
         )}
       >
