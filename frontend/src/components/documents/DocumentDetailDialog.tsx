@@ -15,7 +15,6 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { useDeleteDocument, useDocument, useDocumentChunks } from '@/hooks/useDocuments';
 import { formatBytes, formatRelativeTime, truncateFilename } from '@/lib/utils';
 import { cn } from '@/lib/utils';
@@ -88,8 +87,8 @@ export function DocumentDetailDialog({ docId, open, onOpenChange }: DocumentDeta
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl overflow-hidden">
-        <DialogHeader>
+      <DialogContent className="flex w-[calc(100vw_-_2rem)] min-w-0 max-w-4xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-5 pb-4 pr-14 pt-6 sm:px-6 sm:pr-14">
           <div className="flex min-w-0 items-center gap-2">
             <FileText className="h-4 w-4 text-muted-foreground" />
             <DialogTitle className="truncate" title={meta?.filename}>
@@ -99,96 +98,98 @@ export function DocumentDetailDialog({ docId, open, onOpenChange }: DocumentDeta
               <Badge variant={status.variant} className="ml-2">{status.label}</Badge>
             )}
           </div>
-          {meta && (
-            <DialogDescription>
+          <DialogDescription>
+            {meta ? (
+              <>
               {formatBytes(meta.size)} ·{' '}
               {meta.page_count ? `${meta.page_count} 页 · ` : ''}
               {meta.chunk_count} chunks · 上传 {formatRelativeTime(meta.created_at)}
-            </DialogDescription>
-          )}
+              </>
+            ) : '正在加载文档信息…'}
+          </DialogDescription>
         </DialogHeader>
 
-        {/* ========== 拆分规则 ========== */}
-        {meta && (
-          <div className="rounded-md border bg-muted/30 p-3 text-xs">
-            <div className="mb-2 flex items-center gap-1.5 font-medium text-foreground">
-              <Cog className="h-3.5 w-3.5" />
-              拆分规则
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <RuleItem icon={FileSearch} label="解析器" value={meta.parser ?? '—'} />
-              <RuleItem icon={Hash} label="chunk size" value={meta.chunk_size ? `${meta.chunk_size} tokens` : '—'} />
-              <RuleItem icon={Hash} label="chunk overlap" value={meta.chunk_overlap != null ? `${meta.chunk_overlap} tokens` : '—'} />
-              <RuleItem
-                icon={Sparkles}
-                label="上下文预置"
-                value={meta.contextual_retrieval ? '开启 (Anthropic-style)' : '关闭'}
-                highlight={meta.contextual_retrieval}
-              />
-              <RuleItem
-                icon={Layers}
-                label="语义分块"
-                value={meta.semantic_chunking ? '开启' : '关闭'}
-                highlight={meta.semantic_chunking}
-              />
-              <RuleItem icon={Type} label="层次化" value="Parent 2000t → Child" />
-              <RuleItem icon={BookOpen} label="Embedding 模型" value="BGE-M3" />
-              <RuleItem icon={Cog} label="Reranker" value="bge-reranker-v2-m3" />
-            </div>
-          </div>
-        )}
-
-        {/* ========== 错误信息 (failed 时) ========== */}
-        {meta?.status === 'failed' && meta.error && (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
-            ⚠️ 摄入失败: {meta.error}
-          </div>
-        )}
-
-        {/* ========== Chunks 列表 ========== */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-foreground">
-              <Layers className="h-3.5 w-3.5" />
-              Chunks 预览
-              <span className="text-muted-foreground">
-                ({chunks.data?.returned ?? 0} / {chunks.data?.total ?? meta?.chunk_count ?? 0})
-              </span>
-            </div>
-          </div>
-
-          {chunks.isLoading && (
-            <div className="flex items-center justify-center py-6 text-muted-foreground">
-              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
-              <span className="text-xs">加载 chunks…</span>
+        <div className="scrollbar-thin min-h-0 min-w-0 flex-1 space-y-4 overflow-x-hidden overflow-y-auto overscroll-contain px-5 pb-4 sm:px-6">
+          {/* ========== 拆分规则 ========== */}
+          {meta && (
+            <div className="min-w-0 rounded-[1rem] border border-white/[0.07] bg-black/15 p-3 text-xs">
+              <div className="mb-2 flex items-center gap-1.5 font-medium text-foreground">
+                <Cog className="h-3.5 w-3.5" />
+                拆分规则
+              </div>
+              <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4">
+                <RuleItem icon={FileSearch} label="解析器" value={meta.parser ?? '—'} />
+                <RuleItem icon={Hash} label="chunk size" value={meta.chunk_size ? `${meta.chunk_size} tokens` : '—'} />
+                <RuleItem icon={Hash} label="chunk overlap" value={meta.chunk_overlap != null ? `${meta.chunk_overlap} tokens` : '—'} />
+                <RuleItem
+                  icon={Sparkles}
+                  label="上下文预置"
+                  value={meta.contextual_retrieval ? '开启 (Anthropic-style)' : '关闭'}
+                  highlight={meta.contextual_retrieval}
+                />
+                <RuleItem
+                  icon={Layers}
+                  label="语义分块"
+                  value={meta.semantic_chunking ? '开启' : '关闭'}
+                  highlight={meta.semantic_chunking}
+                />
+                <RuleItem icon={Type} label="层次化" value="Parent 2000t → Child" />
+                <RuleItem icon={BookOpen} label="Embedding 模型" value="BGE-M3" />
+                <RuleItem icon={Cog} label="Reranker" value="bge-reranker-v2-m3" />
+              </div>
             </div>
           )}
 
-          {chunks.isError && (
-            <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
-              ⚠️ 加载失败
+          {/* ========== 错误信息 (failed 时) ========== */}
+          {meta?.status === 'failed' && meta.error && (
+            <div className="max-w-full break-words rounded-md border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+              ⚠️ 摄入失败: {meta.error}
             </div>
           )}
 
-          {chunks.data && grouped.length === 0 && (
-            <div className="rounded border border-dashed p-6 text-center text-xs text-muted-foreground">
-              还没有 chunks. 文档可能还在解析中, 或内容为空.
+          {/* ========== Chunks 列表 ========== */}
+          <div className="min-w-0 space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex min-w-0 items-center gap-1.5 text-xs font-medium text-foreground">
+                <Layers className="h-3.5 w-3.5 shrink-0" />
+                <span className="shrink-0">Chunks 预览</span>
+                <span className="truncate text-muted-foreground">
+                  ({chunks.data?.returned ?? 0} / {chunks.data?.total ?? meta?.chunk_count ?? 0})
+                </span>
+              </div>
             </div>
-          )}
 
-          {chunks.data && grouped.length > 0 && (
-            <ScrollArea className="h-[40vh] rounded-md border">
-              <div className="divide-y">
+            {chunks.isLoading && (
+              <div className="flex items-center justify-center py-6 text-muted-foreground">
+                <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                <span className="text-xs">加载 chunks…</span>
+              </div>
+            )}
+
+            {chunks.isError && (
+              <div className="rounded border border-destructive/50 bg-destructive/10 p-3 text-xs text-destructive">
+                ⚠️ 加载失败
+              </div>
+            )}
+
+            {chunks.data && grouped.length === 0 && (
+              <div className="rounded border border-dashed p-6 text-center text-xs text-muted-foreground">
+                还没有 chunks. 文档可能还在解析中, 或内容为空.
+              </div>
+            )}
+
+            {chunks.data && grouped.length > 0 && (
+              <div className="min-w-0 max-w-full overflow-hidden rounded-[1rem] border border-white/[0.07]">
                 {grouped.map((g, gi) => (
                   <ChunkGroup key={gi} heading={g.heading} chunks={g.items} />
                 ))}
               </div>
-            </ScrollArea>
-          )}
+            )}
+          </div>
         </div>
 
         {/* ========== 底部操作 ========== */}
-        <DialogFooter className="border-t pt-3">
+        <DialogFooter className="shrink-0 border-t border-white/[0.07] px-5 py-4 sm:px-6">
           {meta?.status === 'failed' && meta.error && (
             <span className="mr-auto text-[10px] text-destructive">⚠️ 摄入失败</span>
           )}
@@ -226,14 +227,14 @@ function RuleItem({
 }) {
   return (
     <div className={cn(
-      'rounded border bg-background px-2 py-1.5',
+      'min-w-0 overflow-hidden rounded border bg-background px-2 py-1.5',
       highlight && 'border-emerald-300 bg-emerald-50/50 dark:bg-emerald-950/20',
     )}>
       <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
         <Icon className="h-3 w-3" />
         {label}
       </div>
-      <div className="mt-0.5 font-mono text-[11px] text-foreground">{value}</div>
+      <div className="mt-0.5 break-words font-mono text-[11px] text-foreground [overflow-wrap:anywhere]">{value}</div>
     </div>
   );
 }
@@ -241,17 +242,17 @@ function RuleItem({
 function ChunkGroup({ heading, chunks }: { heading: string | null; chunks: DocumentChunk[] }) {
   const [open, setOpen] = useState(true);
   return (
-    <div>
+    <div className="min-w-0 max-w-full overflow-hidden border-b border-white/[0.06] last:border-b-0">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-1.5 bg-muted/20 px-3 py-1.5 text-left text-xs font-medium hover:bg-muted/40"
+        className="flex min-w-0 w-full items-center gap-1.5 bg-muted/20 px-3 py-2 text-left text-xs font-medium hover:bg-muted/40"
       >
         {open ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
         <span className="truncate">{heading ?? '（无标题）'}</span>
-        <span className="ml-auto text-[10px] text-muted-foreground">{chunks.length} 个 chunk</span>
+        <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{chunks.length} 个 chunk</span>
       </button>
       {open && (
-        <div className="space-y-1.5 p-2">
+        <div className="min-w-0 space-y-1.5 p-2">
           {chunks.map((c) => (
             <ChunkCard key={c.id} chunk={c} />
           ))}
@@ -263,7 +264,7 @@ function ChunkGroup({ heading, chunks }: { heading: string | null; chunks: Docum
 
 function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
   return (
-    <div className="rounded border bg-card p-2 text-[11px]">
+    <div className="min-w-0 max-w-full overflow-hidden rounded border bg-card p-2 text-[11px]">
       <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
         <Badge variant="outline" className="font-mono">#{chunk.chunk_index}</Badge>
         {chunk.page_no != null && (
@@ -273,13 +274,13 @@ function ChunkCard({ chunk }: { chunk: DocumentChunk }) {
           <span className="font-mono">{chunk.token_count} tokens</span>
         )}
         {chunk.context_prefix && (
-          <span className="ml-auto inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+          <span className="ml-auto inline-flex min-w-0 max-w-full items-center gap-1 truncate rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
             <Sparkles className="h-2.5 w-2.5" />
             {chunk.context_prefix.slice(0, 50)}{chunk.context_prefix.length > 50 ? '…' : ''}
           </span>
         )}
       </div>
-      <p className="whitespace-pre-wrap break-words text-foreground/90 leading-relaxed">{chunk.text}</p>
+      <p className="max-w-full whitespace-pre-wrap break-words text-foreground/90 leading-relaxed [overflow-wrap:anywhere]">{chunk.text}</p>
     </div>
   );
 }

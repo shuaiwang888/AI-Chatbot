@@ -651,6 +651,16 @@ function _clearTokenBuffer() {  // 单纯清 (切 session / reset 时用, 不需
 
 **验证**: TypeScript `tsc -b --noEmit` 和 Vite 生产构建通过；Playwright 验证 1280×720、1440×900 桌面端与 390×844 移动端，覆盖匿名首屏、令牌面板、资料抽屉与响应式切换；前端 console 无代码错误。
 
+### 4.18 [前端] 文档详情右侧被裁剪且底部操作不可见
+
+**问题**: 打开大文档的 chunks 详情后，长文本将内容容器向右撑宽，弹窗右侧无法完整展示；内容较多时底部的删除和关闭操作也会被裁掉。
+
+**根因**: `DocumentDetailDialog` 的 `overflow-hidden` 覆盖了通用弹窗的纵向滚动；同时 Radix `ScrollArea` 的测量容器会按 chunk 长文本的固有宽度扩张，内层缺少连续的 `min-w-0` 和强制断行约束。
+
+**修复**: 详情弹窗改为固定头部、单一纵向滚动正文、固定底部操作栏；去掉容易产生固有宽度的嵌套 `ScrollArea`；对规则网格、分组、chunk 卡片和正文逐层增加 `min-w-0` / `max-w-full` / `overflow-wrap:anywhere`；元数据未返回时也始终渲染 `DialogDescription`，消除 Radix 无障碍警告。
+
+**验证**: Vite 生产构建通过；Playwright 用生产 `Happy-LLM.pdf` 的 200 / 476 个 chunks 实测，1440×900 桌面端与 390×844 移动端均无横向裁剪，长中英文、表格文本正常换行，底部操作始终可见。
+
 ---
 
 ## 5. 已建立的工具脚本 (遇到问题先看这里)
